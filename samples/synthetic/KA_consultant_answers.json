@@ -1,0 +1,175 @@
+{
+ "columns": [
+  {
+   "mark": "C01",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C02",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C03",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C04",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C05",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C06",
+   "width": 300.0,
+   "depth": 600.0
+  },
+  {
+   "mark": "C07",
+   "width": 300.0,
+   "depth": 600.0
+  },
+  {
+   "mark": "C08",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C09",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C10",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C11",
+   "width": 300.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "C12",
+   "width": 300.0,
+   "depth": 450.0
+  }
+ ],
+ "beams": [
+  {
+   "mark": "B01",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B02",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B03",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B04",
+   "width": 300.0,
+   "depth": 600.0
+  },
+  {
+   "mark": "B05",
+   "width": 300.0,
+   "depth": 600.0
+  },
+  {
+   "mark": "B06",
+   "width": 300.0,
+   "depth": 600.0
+  },
+  {
+   "mark": "B07",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B08",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B09",
+   "width": 230.0,
+   "depth": 450.0
+  },
+  {
+   "mark": "B10",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B11",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B12",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B13",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B14",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B15",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B16",
+   "width": 230.0,
+   "depth": 500.0
+  },
+  {
+   "mark": "B17",
+   "width": 230.0,
+   "depth": 500.0
+  }
+ ],
+ "slabs": [
+  {
+   "mark": "S1",
+   "thickness": 125
+  },
+  {
+   "mark": "S2",
+   "thickness": 150
+  }
+ ],
+ "levels": [
+  {
+   "level": "GF",
+   "elevation": 0
+  },
+  {
+   "level": "L1",
+   "elevation": 3300
+  },
+  {
+   "level": "L2",
+   "elevation": 6600
+  }
+ ]
+}

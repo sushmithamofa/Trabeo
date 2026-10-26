@@ -1,0 +1,147 @@
+{
+  "_comment": "Layer mapping and tolerances for the CAD to Revit extractor. Layer patterns are case-insensitive; * is a wildcard. Roles are tested in the order listed under layer_roles, so put specific patterns before general ones. Edit this file to suit a different consultant's layer names - no code change is needed.",
+
+  "tolerances": {
+    "tag_max_distance_mm": 2000,
+    "tag_warn_distance_mm": 300,
+    "tag_assign_limit_mm": 700,
+    "close_gap_tolerance_mm": 50,
+    "rect_side_tolerance_mm": 5,
+    "rect_angle_tolerance_deg": 3,
+    "alignment_tolerance_deg": 1.0,
+    "duplicate_tolerance_mm": 1.0,
+    "flat_z_tolerance_mm": 1.0,
+    "min_column_side_mm": 100,
+    "max_column_side_mm": 3000,
+    "beam_min_length_mm": 300,
+    "beam_join_snap_mm": 800,
+    "beam_join_min_angle_deg": 15,
+    "beam_join_overshoot_mm": 300,
+    "beam_support_snap_mm": 800,
+    "face_pair_min_width_mm": 100,
+    "face_pair_max_width_mm": 700,
+    "face_pair_min_overlap": 0.5,
+    "face_pair_max_angle_deg": 3,
+    "stacked_tolerance_mm": 5,
+    "beam_alignment_tolerance_deg": 5,
+    "split_beams_at_crossings": false
+  },
+
+  "defaults": {
+    "beam_width_mm": 230,
+    "girder_width_mm": 350,
+    "wall_thickness_mm": 230
+  },
+
+  "hatch_lines": {
+    "detect": true,
+    "roles": ["beam", "girder", "column", "column_stop", "column_float", "wall", "slab"],
+    "min_lines": 8,
+    "max_spacing_mm": 600,
+    "regular_fraction": 0.6
+  },
+  "_hatch_lines_help": "Shading drawn as ordinary lines on a structural layer looks exactly like a beam: straight, right layer, right sort of length. On the Wing B plan 162 of the 186 lines on GIRDER BEAM are hatch fill and 79 became girders. The test is not the angle but the pattern: many parallel lines, evenly spaced, far too close together to be structure. Nothing real is eight parallel beams 300 mm apart. Stair layers are left out of the check on purpose, because treads look the same.",
+  "islands": {
+    "drop": true,
+    "link_mm": 10000,
+    "min_distance_mm": 50000,
+    "max_share": 0.15
+  },
+  "_islands_help": "CAD files collect debris: a fragment dragged off the sheet, a paste that landed in the wrong place. On the Wing B plan seven beam lines sit 2.4 km from the building. Elements are grouped by single linkage at link_mm, and a group is only dropped when it is both further than min_distance_mm from the main body and smaller than max_share of everything. A genuinely detached wing is neither, so it is kept and reported instead. Set drop to false to keep everything.",
+  "assemble_loops": {
+    "roles": ["column", "column_stop", "column_float", "wall", "slab", "opening", "stair"],
+    "snap_mm": 25,
+    "max_lines": 4000,
+    "min_area_mm2": 10000,
+    "max_vertices": 64
+  },
+  "_assemble_loops_help": "Some drafters draw a column as a closed polyline, others as four separate lines. The two look identical on the sheet, but only the first is a shape. Loose lines on these roles are stitched back into outlines by snapping their endpoints together and walking the closed faces. Nothing is invented: a line that closes no face is left alone, and an assembled outline has to pass the same checks a drawn one does. Raise snap_mm if a drawing has sloppier corners; drop a role from the list to stop stitching it.",
+  "legend": {
+    "detect": true,
+    "headings": ["LEGEND", "KEY", "SYMBOLS", "ABBREVIATION", "ABBREVIATIONS"],
+    "pad_mm": 1200,
+    "min_labels": 3,
+    "exclude_zones": []
+  },
+  "_legend_help": "No legend is built in: every legend is read from the drawings - a block under a heading, a column of 'N MM SUNK' captions with no heading (an office or consultant key pasted beside the plan), or a legend sheet imported with the plans. A legend draws a sample column, a sample beam and a sample sunk panel on the very layers it is describing, so they extract as real elements and stand in Revit as a little stack beside the building. The block is found from its own heading and captions, never a hardcoded rectangle, and everything left out is reported. exclude_zones takes [[x1,y1,x2,y2],...] in drawing coordinates for anything else on the sheet that should be ignored.",
+  "schedules": {
+    "read": true,
+    "beam_layers": ["beam sch. text"],
+    "slab_layers": ["slab sch. text"],
+    "column_layers": ["col. sch."]
+  },
+  "_schedules_help": "The beam schedule is usually printed on the same sheet as the plan. A beam's depth exists nowhere else - a centreline carries no depth - so without this every beam is built at one default size. Name the text layers the tables sit on. A beam row is read from the right as width, depth, prefix, marks; a slab row from the left as prefix, mark, thickness. Rows that do not fit are skipped and counted, never guessed. Set read to false to ignore the drawn schedules and use the workbook only.",
+  "blocks": {
+    "explode": "auto",
+    "scale_tolerance": 0.02,
+    "max_depth": 4,
+    "min_report": 3,
+    "explode_names": [],
+    "skip_names": []
+  },
+  "_blocks_help": "Structure drawn inside a block is invisible unless the block is opened out. 'auto' opens any block inserted at a uniform scale of 1.0 and leaves the rest shut, because sections, details and schedules are blocks too and are usually inserted at another scale. A shut block holding structural layers is always reported, never dropped silently. Use explode_names to force one open, skip_names to keep one shut. Both accept * wildcards.",
+  "markup_comment_on": ["blocker"],
+  "_markup_help": "Which severities get their comment written out on the plan in queries.dxf. Everything is clouded and numbered whatever this says, and the query schedule beside the plan carries the full wording for all of them. Use [\"blocker\", \"warning\"] for a fuller markup, or [] for clouds and numbers only.",
+
+  "base_point": "auto",
+  "_base_point_help": "\"auto\" puts the local origin at the south-west corner of the column set. Replace with [x, y] in drawing units to use an agreed shared point.",
+
+  "layer_roles": {
+    "column_float": ["FL COL", "FLOATING COLUMN", "S-COL-FLOAT"],
+    "column_stop": ["S-COL-STOP", "COL STOP"],
+    "column": ["COLUMN", "COLUMNS", "S-COL"],
+    "wall": ["R.C.C. PARDI", "RCC PARDI", "RET WALL", "RETAINING WALL", "S-WALL"],
+    "girder": ["GIRDER BEAM", "GIRDER", "S-GIRDER"],
+    "beam": ["BEAM", "S-BEAM"],
+    "slab": ["SLAB", "S-SLAB"],
+    "sunk": ["*SUNK*", "S-SUNK-*"],
+    "opening": ["RECS_CUT OUT", "VOID", "S-OPEN"],
+    "stair": ["STAIRCASE", "STAIRS_MOFA", "S-STAIR"],
+    "grid": ["S-GRID", "GRID", "GRIDS", "GRIDLINE*", "*_GRID", "GRID_*"],
+    "column_tag": ["COLNO", "COL NO", "S-COL-TAG", "S-WALL-TAG"],
+    "beam_tag": ["BEAM NO (H)", "BEAM NO (V)", "BEAM NO*", "S-BEAM-TAG", "S-GIRDER-TAG"],
+    "slab_tag": ["SLAB NO", "S-SLAB-TAG"],
+    "ignore": [
+      "0", "DEFPOINTS", "SHEET", "MAIN TEXT", "TEXT", "TXT", "DIM", "S-DIM",
+      "COL. SCH.", "BEAM SCH. TEXT", "SLAB SCH. TEXT", "BEAM & SLAB DETAIL",
+      "SLAB MARK", "*HATCH*", "LOGO", "LAYOUT_LEGEND", "SEC", "D-SHEET",
+      "LINE- 1", "LINE- 2", "3MCO", "CONCRETE", "REINF", "SBC COMMENTS",
+      "ELEV_15_MOFA", "S- LEVEL", "S-ANNO", "S-REF", "A-ANNO-SCRN",
+      "G-ANNO-NPLT", "ANNO TAG_MOFA", "RECS_CONCRETE", "S-HATCH"
+    ]
+  },
+
+  "_split_help": "split_beams_at_crossings=true cuts every beam line into spans where other beams cross it, which is how Revit and the schedule treat them. It roughly doubles the beam count and most of the new spans have no mark of their own, so it is off until the consultant confirms one mark per span.",
+
+  "wall_mark_prefixes": ["LW"],
+  "_wall_mark_help": "A shape on a column layer whose matched mark starts with one of these is re-classified as a wall.",
+
+  "sunk_depth_override": {},
+  "_sunk_depth_help": "Layer name -> real sunk depth in mm, e.g. {\"300mm SUNK\": 150, \"900MM SUNK\": 400}. Until a layer is listed here the depth is read from its name, and a query is raised if the name and the legend disagree.",
+
+  "mark_prefixes": {
+    "column": ["C", "FC"],
+    "wall": ["LW"],
+    "beam": ["B", "BC", "BP", "MLB", "BKT"],
+    "girder": ["GB"],
+    "slab": ["S", "ST"]
+  },
+
+  "output_layers": {
+    "column": "S-COL",
+    "column_stop": "S-COL-STOP",
+    "column_float": "S-COL-FLOAT",
+    "wall": "S-WALL",
+    "beam": "S-BEAM",
+    "girder": "S-GIRDER",
+    "slab": "S-SLAB",
+    "opening": "S-OPEN",
+    "stair": "S-STAIR",
+    "grid": "S-GRID",
+    "column_tag": "S-COL-TAG",
+    "wall_tag": "S-WALL-TAG",
+    "beam_tag": "S-BEAM-TAG",
+    "girder_tag": "S-GIRDER-TAG",
+    "slab_tag": "S-SLAB-TAG"
+  }
+}

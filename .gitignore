@@ -1,0 +1,45 @@
+# Trabeo - what never goes to GitHub.
+# Clients' drawings and anything read from them, private notes, people's e-mail addresses
+# and the sign-in files stay on the developer's PC only.
+
+# --- made by the app on every run (analyses, caches) ---
+runs/
+__pycache__/
+*.pyc
+_c2r_project/
+dxf_cache/
+
+# --- clients' drawings, anywhere ---
+*.dwg
+*.bak
+*.dxf
+# ... except the small made-up drawing set behind "Try a sample"
+!samples/synthetic/**/*.dxf
+
+# --- clients' drawings and the results read from them ---
+samples/training/
+samples/New block.dwg
+baselines/
+standard/J1153*
+standard/*J1153*
+standard/Wing-C-*
+
+# --- office material and private notes ---
+presentation/
+MOFA STRUCTURE LEGENDS.dwg
+CAD-to-Revit-chat*.md
+chat/
+SESSION_NOTES.md
+HANDOFF_*.md
+New_block_check.png
+TEST_CHECKLIST.md
+
+# --- sign-in: approved users' e-mails and this PC's settings ---
+access/
+access_config.json
+
+# --- editors and the operating system ---
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

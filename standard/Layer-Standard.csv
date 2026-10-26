@@ -1,0 +1,25 @@
+Layer,Contents,Entity type,Closed required,Maps from current file
+S-COL,Columns continuing above this floor,Closed polyline,Yes,COLUMN
+S-COL-STOP,Columns stopping at this floor,Closed polyline,Yes,(new)
+S-COL-FLOAT,Floating columns,Closed polyline,Yes,FL COL
+S-WALL,"Lift walls, RCC pardi, retaining walls",Closed polyline,Yes,"R.C.C. PARDI + lift wall pieces on COLUMN"
+S-BEAM,Beam centrelines,Line or polyline,No,BEAM
+S-GIRDER,Girder centrelines,Line or polyline,No,GIRDER BEAM
+S-SLAB,One closed outline per slab panel,Closed polyline,Yes,SLAB
+S-SUNK-100,Sunk 100 zones,Closed polyline,Yes,"300mm SUNK / 900MM SUNK / SUNK / HATCH - to be confirmed"
+S-SUNK-150,Sunk 150 zones,Closed polyline,Yes,"300mm SUNK / 900MM SUNK / SUNK / HATCH - to be confirmed"
+S-SUNK-400,Sunk 400 zones,Closed polyline,Yes,"300mm SUNK / 900MM SUNK / SUNK / HATCH - to be confirmed"
+S-SUNK-POOL,Pool slab,Closed polyline,Yes,(new)
+S-SUNK-DECK,Deck slab,Closed polyline,Yes,(new)
+S-OPEN,Openings and cut-outs,Closed polyline,Yes,RECS_CUT OUT (empty)
+S-STAIR,Stair flights and landings,Closed polyline,Yes,STAIRCASE / STAIRS_MOFA
+S-GRID,Grid lines and bubbles,"Line, circle, text",No,(none exists)
+S-REF,"Shared base point, level marks","Point, text",No,S- LEVEL (empty)
+S-COL-TAG,Column marks,Text,No,colno
+S-WALL-TAG,Wall marks,Text,No,colno (LW marks)
+S-BEAM-TAG,Beam marks,Text,No,BEAM NO (H) + BEAM NO (V)
+S-GIRDER-TAG,Girder marks,Text,No,BEAM NO (H) + BEAM NO (V)
+S-SLAB-TAG,Slab marks,Text,No,SLAB NO
+S-HATCH,Hatches for printing only,Hatch,No,"COL HATCH, GIRDER-HATCH, RET WALL HATCH"
+S-DIM,Dimensions,Dimension,No,DIM
+S-ANNO,"Notes, legend, schedules, title block, details",Any,No,"SHEET, MAIN TEXT, Col. sch., beam sch. text, slab sch. text, beam & slab detail"
