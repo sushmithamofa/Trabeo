@@ -1,0 +1,55 @@
+{
+ "all": {
+  "correct": 34
+ },
+ "rows": {
+  "beams:B01": "correct",
+  "beams:B02": "correct",
+  "beams:B03": "correct",
+  "beams:B04": "correct",
+  "beams:B05": "correct",
+  "beams:B06": "correct",
+  "beams:B07": "correct",
+  "beams:B08": "correct",
+  "beams:B09": "correct",
+  "beams:B10": "correct",
+  "beams:B11": "correct",
+  "beams:B12": "correct",
+  "beams:B13": "correct",
+  "beams:B14": "correct",
+  "beams:B15": "correct",
+  "beams:B16": "correct",
+  "beams:B17": "correct",
+  "columns:C01": "correct",
+  "columns:C02": "correct",
+  "columns:C03": "correct",
+  "columns:C04": "correct",
+  "columns:C05": "correct",
+  "columns:C06": "correct",
+  "columns:C07": "correct",
+  "columns:C08": "correct",
+  "columns:C09": "correct",
+  "columns:C10": "correct",
+  "columns:C11": "correct",
+  "columns:C12": "correct",
+  "levels:GF": "correct",
+  "levels:L1": "correct",
+  "levels:L2": "correct",
+  "slabs:S1": "correct",
+  "slabs:S2": "correct"
+ },
+ "totals": {
+  "beams": {
+   "correct": 17
+  },
+  "columns": {
+   "correct": 12
+  },
+  "levels": {
+   "correct": 3
+  },
+  "slabs": {
+   "correct": 2
+  }
+ }
+}

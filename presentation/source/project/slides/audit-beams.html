@@ -1,0 +1,51 @@
+<section id="audit-beams" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; beams and girders &#183; 6 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Beams: the geometry is there, the centrelines are not</h2>
+  </div>
+  <table style="font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; border-bottom:1px solid #DCD9D0; padding:14px 18px">
+    <tr style="background:#16202B">
+      <th style="width:22%; color:#F7F6F2; text-align:left; font-size:24px">Issue</th>
+      <th style="width:48%; color:#F7F6F2; text-align:left; font-size:24px">What the DWG contains</th>
+      <th style="width:30%; color:#F7F6F2; text-align:left; font-size:24px">What closes it</th>
+    </tr>
+    <tr>
+      <td>Lines are faces</td>
+      <td>Top-justified multilines, so each line is a face, 115 mm off centre</td>
+      <td>Draw one centreline per span</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Mixed entity types</td>
+      <td>113 multilines, 49 plain lines and 8 polylines</td>
+      <td>One entity type for all beams</td>
+    </tr>
+    <tr>
+      <td>Girder widths absent</td>
+      <td>Only 2 girders are drawn, both 350 wide, against 9 GB tags from 350 to 1500</td>
+      <td>Draw girders at schedule width</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Tags away from lines</td>
+      <td>B54 is 2.2 m from any beam, B87 is 2.7 m; BP1, BP2 and BP3 match nothing</td>
+      <td>Place within 300 mm</td>
+    </tr>
+    <tr>
+      <td>Scheduled, not tagged</td>
+      <td>B-60 appears only inside S4A/B60; B-94 and B-97 are absent; GB3A is tagged twice</td>
+      <td>One tag per span, once</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Off-angle lines</td>
+      <td>The plan sits at 2 degrees, one wing at 69; stray lines run at 0, 6 and 85</td>
+      <td>Align every line to the grid</td>
+    </tr>
+    <tr>
+      <td>Schedule gaps</td>
+      <td>B-103 and B-106 carry no depth; GB-5 reads 1480 800/; B-34 reads 700/ and varies</td>
+      <td>Complete the schedule rows</td>
+    </tr>
+  </table>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">09</p>
+  <aside>The first row is the one to dwell on, and the next slide draws it. The last row is worth reading out verbatim: those three schedule entries cannot be modelled at all until someone completes them.</aside>
+</section>

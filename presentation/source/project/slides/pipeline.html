@@ -1,0 +1,46 @@
+<section id="pipeline" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:32px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">How it works</p>
+    <h2 style="font-size:68px; font-weight:600; line-height:1.1; width:1500px">Five steps from DWG to a checked Revit model</h2>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">1</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Read the layers</h3>
+        <p style="font-size:26px; color:#4C5A66">Column, wall, beam, girder, slab and sunk layers come out as shapes with coordinates.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">2</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Match every tag to its shape</h3>
+        <p style="font-size:26px; color:#4C5A66">Each mark text is joined to the nearest element, so C-3 and B-34 attach to real geometry.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">3</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Join the schedules</h3>
+        <p style="font-size:26px; color:#4C5A66">Excel rows supply size, thickness, concrete grade and reinforcement for each mark.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">4</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Place in Revit</h3>
+        <p style="font-size:26px; color:#4C5A66">Levels and grids first, then columns, beams, floors with their sunk offsets, then the 230 walls.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">5</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Audit against the sheet</h3>
+        <p style="font-size:26px; color:#4C5A66">Marks without geometry, geometry without marks, clashes, and Revit schedules compared to the GFC tables.</p>
+      </div>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">05</p>
+  <aside>Step 5 is the one to stress with management: the script does not ask to be trusted. Every run produces a list of what it could not place, so drawing and model are reconciled rather than assumed.</aside>
+</section>

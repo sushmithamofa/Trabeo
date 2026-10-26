@@ -1,0 +1,35 @@
+﻿mark,type,x_local,y_local,width_mm,depth_mm,rotation_deg,x_drawing,y_drawing,source_layer,tag_distance_mm,outline_repaired,notes,handle
+,column,15499.1,11553.0,230.0,950.0,2.031,2916448.3,91642.5,COLUMN,,,,
+1,column,0.0,16336.1,230.0,1250.0,92.032,2900949.2,96425.6,COLUMN,461.8,,,17908D
+10,column,23134.0,12409.4,230.0,1599.0,92.032,2924083.2,92499.0,COLUMN,520.0,,,
+10A,column,38856.0,1347.7,230.0,1200.0,92.031,2939805.2,81437.2,COLUMN,1036.5,,,
+11,column,26933.4,13344.2,230.0,950.0,92.031,2927882.7,93433.7,COLUMN,542.2,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-6
+12,column,30797.2,12454.7,230.0,950.0,92.031,2931746.4,92544.3,COLUMN,485.4,,,
+13,column,34588.6,13615.7,230.0,950.0,92.031,2935537.8,93705.3,COLUMN,448.9,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-8
+15,column,8070.7,4905.3,230.0,1499.9,92.032,2909019.9,84994.9,COLUMN,503.7,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-4
+16,column,15725.6,5180.5,230.0,1499.9,92.032,2916674.8,85270.1,COLUMN,519.2,,,
+17,column,23381.0,5448.4,230.0,1499.9,92.032,2924330.3,85537.9,COLUMN,579.7,,,
+18,column,27209.9,5543.5,230.0,950.0,92.031,2928159.2,85633.1,COLUMN,401.5,,,
+19,column,31036.2,5720.0,230.0,1499.9,92.032,2931985.4,85809.6,COLUMN,651.1,,,
+2,column,7720.7,14774.0,230.0,950.0,2.031,2908669.9,94863.6,COLUMN,474.1,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-0
+21,column,579.5,0.0,229.9,1180.0,92.032,2901528.8,80089.6,COLUMN,430.3,,,17908C
+22,column,8234.9,278.1,230.1,1200.0,92.023,2909184.2,80367.7,COLUMN,648.5,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-5
+23,column,15889.7,553.4,229.9,1200.0,92.032,2916839.0,80642.9,COLUMN,521.2,,,
+24,column,23545.2,821.2,229.9,1200.0,92.032,2924494.4,80910.7,COLUMN,471.5,,,
+25,column,31200.4,1092.8,229.9,1200.0,92.032,2932149.6,81182.4,COLUMN,516.1,,,
+3,column,15375.4,15045.5,230.0,950.0,2.031,2916324.6,95135.1,COLUMN,654.8,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-1
+3A,column,38469.7,12236.8,230.0,1500.0,92.032,2939419.0,92326.3,COLUMN,771.2,,,
+4,column,23030.5,15317.1,230.0,950.0,2.031,2923979.8,95406.6,COLUMN,488.5,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-2
+4A,column,38090.8,15854.7,230.0,950.0,2.031,2939040.0,95944.2,COLUMN,743.0,,,
+5,column,30685.7,15589.0,230.0,950.0,2.031,2931634.9,95678.6,COLUMN,777.5,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-7
+7,column,222.7,10058.7,230.0,950.0,92.032,2901172.0,90148.2,COLUMN,434.7,,,17908B
+7A,column,38691.2,5994.9,230.0,1500.0,92.031,2939640.4,86084.5,COLUMN,877.3,,,
+8,column,7845.5,11254.8,230.0,2815.0,92.032,2908794.7,91344.3,COLUMN,854.5,,"outline assembled from separate lines, not drawn as one polyline",assembled-column-3
+9,column,15472.8,12304.4,230.0,1273.7,92.012,2916422.1,92393.9,COLUMN,981.3,,,
+FC1,column,11649.4,12051.8,230.0,950.0,92.031,2912598.7,92141.4,COLUMN,1240.3,,,179D04
+FC2,column,113.3,13142.8,230.0,1050.0,92.032,2901062.6,93232.3,COLUMN,1298.6,,,17909A
+FC2A,column,3703.5,9821.9,230.0,950.0,2.031,2904652.7,89911.5,COLUMN,864.8,,,179D0A
+FC3,column,21294.0,10255.7,230.0,950.0,2.031,2922243.2,90345.3,COLUMN,1832.0,,,179D0E
+FC4,column,11898.0,5044.5,230.0,950.0,92.031,2912847.2,85134.1,COLUMN,499.0,,,179D0B
+FC5,column,19553.2,5316.1,230.0,950.0,92.031,2920502.4,85405.6,COLUMN,1261.0,,,179D0C
+FC6,column,34863.5,5859.2,230.0,950.0,92.031,2935812.8,85948.7,COLUMN,1198.7,,,179D0D

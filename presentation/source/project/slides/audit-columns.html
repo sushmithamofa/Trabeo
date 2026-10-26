@@ -1,0 +1,51 @@
+<section id="audit-columns" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; columns and walls &#183; 7 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Columns: duplicates, open shapes and stray heights</h2>
+  </div>
+  <table style="font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; border-bottom:1px solid #DCD9D0; padding:14px 18px">
+    <tr style="background:#16202B">
+      <th style="width:18%; color:#F7F6F2; text-align:left; font-size:24px">Issue</th>
+      <th style="width:52%; color:#F7F6F2; text-align:left; font-size:24px">What the DWG contains</th>
+      <th style="width:30%; color:#F7F6F2; text-align:left; font-size:24px">What closes it</th>
+    </tr>
+    <tr>
+      <td>Duplicates</td>
+      <td>10 column outlines drawn twice, one over the other</td>
+      <td>Delete duplicates before issue</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Open outlines</td>
+      <td>C-24, C-25, C-30 and two unlabelled shapes are open 5-point polylines</td>
+      <td>Close every column outline</td>
+    </tr>
+    <tr>
+      <td>C-30 size</td>
+      <td>Drawn 230x827; the schedule says 230x950; an unlabelled 230x950 sits 0.9 m away</td>
+      <td>Confirm the size and retag</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Not in schedule</td>
+      <td>C-11, 15, 16, 19 and 20 are drawn at 350x750</td>
+      <td>Confirm as column stops</td>
+    </tr>
+    <tr>
+      <td>Unlabelled shapes</td>
+      <td>350x1480, 350x2000, 230x230, plus lift-wall pieces 230x2110 and 230x1950</td>
+      <td>Tag, or move to the wall layer</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Stray Z heights</td>
+      <td>C-3A, 4A, 7A and 10A sit at Z = -11,425; tags range from 229 to 14,784</td>
+      <td>Flatten the drawing to Z = 0</td>
+    </tr>
+    <tr>
+      <td>Tags too far</td>
+      <td>Column numbers sit 200 to 1,400 mm away from the column they label</td>
+      <td>Place within 300 mm</td>
+    </tr>
+  </table>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">08</p>
+  <aside>Two rows matter most in the room: the duplicates, which would silently create double columns in Revit, and the tag distance, which is what makes label-to-column matching unreliable. The rest is clean-up anyone can run in ten minutes.</aside>
+</section>

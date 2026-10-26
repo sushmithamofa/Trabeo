@@ -1,0 +1,62 @@
+</div>
+<div id="hint">&#8592; &#8594; slides &#183; N notes &#183; P print or PDF</div>
+<div id="chrome"><span id="cur">1</span> / <span id="tot">22</span></div>
+<div id="notes"></div>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var slides = [].slice.call(stage.querySelectorAll('section'));
+  var notes = document.getElementById('notes');
+  var i = 0;
+
+  document.getElementById('tot').textContent = slides.length;
+
+  var CHECK = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  [].forEach.call(document.querySelectorAll('x-icon'), function (el) {
+    el.innerHTML = CHECK;
+  });
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, k) {
+      if (k === i) { s.classList.add('live'); } else { s.classList.remove('live'); }
+    });
+    document.getElementById('cur').textContent = i + 1;
+    var a = slides[i].querySelector('aside');
+    notes.innerHTML = '<b>Speaker notes &#183; slide ' + (i + 1) + ' of ' + slides.length + '</b>' +
+      (a ? a.textContent : 'No notes on this slide.');
+    if (history.replaceState) { history.replaceState(null, '', '#' + slides[i].id); }
+  }
+
+  window.addEventListener('resize', fit);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { show(i + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { show(i - 1); e.preventDefault(); }
+    else if (e.key === 'Home') { show(0); }
+    else if (e.key === 'End') { show(slides.length - 1); }
+    else if (e.key === 'n' || e.key === 'N') { notes.classList.toggle('on'); }
+    else if (e.key === 'p' || e.key === 'P') { window.print(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('#notes')) { return; }
+    show(i + 1);
+  });
+
+  fit();
+
+  var start = 0;
+  for (var k = 0; k < slides.length; k++) {
+    if ('#' + slides[k].id === window.location.hash) { start = k; }
+  }
+  show(start);
+})();
+</script>
+</body>
+</html>

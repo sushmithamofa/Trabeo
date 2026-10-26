@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAD to Revit Automation &#8212; J-1153</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#0B1116}
+body{font-family:'IBM Plex Sans',Arial,sans-serif}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px}
+section{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;display:none!important}
+section.live{display:flex!important}
+section>aside{display:none}
+h1,h2,h3,p{margin:0}
+ul,ol{padding-left:1.35em}
+li{margin-bottom:.35em}
+hr{border:0;height:0}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+th,td{padding:14px 18px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(22,32,43,.14);overflow-wrap:break-word}
+svg{display:block}
+x-icon{display:inline-block}
+#chrome{position:fixed;right:22px;bottom:16px;z-index:5;font-family:'JetBrains Mono',Courier New,monospace;font-size:14px;color:#8A9AA6;background:rgba(11,17,22,.72);padding:6px 12px;border-radius:6px}
+#hint{position:fixed;left:22px;bottom:16px;z-index:5;font-family:'JetBrains Mono',Courier New,monospace;font-size:13px;color:#596874}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:36vh;overflow:auto;z-index:6;display:none;background:#0F171E;color:#D7E0E7;border-top:2px solid #1F6FB2;padding:20px 28px 28px;font-size:16px;line-height:1.55}
+#notes.on{display:block}
+#notes b{display:block;margin-bottom:8px;color:#E8A15C;font-family:'JetBrains Mono',Courier New,monospace;font-weight:400;font-size:13px;letter-spacing:1px;text-transform:uppercase}
+@media print{
+@page{size:1920px 1080px;margin:0}
+html,body{overflow:visible;background:#FFFFFF}
+#stage{position:static;transform:none!important;width:auto;height:auto}
+section{position:relative;display:flex!important;page-break-after:always;break-after:page}
+#chrome,#hint,#notes{display:none!important}
+}
+</style>
+</head>
+<body>
+<div id="stage">

@@ -1,0 +1,39 @@
+<section id="setup" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 03</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Drawing setup: seven things fixed before anything is drawn</h2>
+  </div>
+  <div style="display:flex; flex-direction:column">
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Units</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Millimetres, drawn 1:1, nothing scaled or exploded</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Origin</p>
+      <p style="flex:1; font-size:28px; color:#16202B">The architect's base point, identical XY on every floor, never re-rotated</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Heights</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Everything flat at Z = 0, with FLATTEN run before the file is issued</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Files</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One floor per DWG, named J1153_Wing_Level_STR_YYYY-MM-DD.dwg</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Model space</p>
+      <p style="flex:1; font-size:28px; color:#16202B">The plan only, with no xrefs, no images and no viewports in it</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Housekeeping</p>
+      <p style="flex:1; font-size:28px; color:#16202B">OVERKILL run, no duplicated entities, no structural elements inside blocks</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Grids</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Structural grid on S-GRID, matching the architectural grid line for line</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">14</p>
+  <aside>Origin and heights are the two that cost nothing and save the most. The Wing C file breaks both: it sits 2.3 km from its origin and has elements at Z = -11,425.</aside>
+</section>

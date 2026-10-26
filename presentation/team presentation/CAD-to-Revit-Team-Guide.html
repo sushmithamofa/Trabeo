@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAD to Revit - Team Guide</title>
+<style>
+:root{--bg:#f4f3ef;--panel:#fff;--ink:#16202B;--mute:#5f6c77;--line:#e1ded6;--accent:#1f6fb2;--accent2:#e8f1fa;
+ --ok:#2e8b57;--low:#d98a1c;--bad:#c0392b;--miss:#c9a600;--dec:#7b5fb4;--grey:#9aa3ab}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#2b333b;font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--ink)}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.slide{position:absolute;width:1280px;height:720px;background:var(--bg);padding:56px 72px 60px;display:none;
+ transform-origin:center center;overflow:hidden}
+.slide.on{display:block}
+.slide h1{font-size:46px;line-height:1.12;margin:0 0 14px;letter-spacing:-.5px}
+.slide h2{font-size:34px;margin:0 0 6px;letter-spacing:-.3px}
+.slide .lead{font-size:20px;color:var(--mute);margin:0 0 26px;max-width:1000px}
+.slide p,.slide li{font-size:19px;line-height:1.5}
+.kicker{font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.foot{position:absolute;left:72px;right:72px;bottom:22px;display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
+.logo{display:inline-flex;align-items:center;gap:10px;font-weight:700}
+.logo i{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1f6fb2,#2e8b57);display:inline-block}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.cols4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.card h3{margin:0 0 6px;font-size:20px}
+.card p{margin:0;font-size:16.5px;color:var(--mute);line-height:1.45}
+.num{width:38px;height:38px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;
+ font-weight:700;font-size:18px;margin-bottom:12px}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 14px 50px;font-size:18.5px}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:32px;height:32px;border-radius:50%;
+ background:var(--accent2);color:var(--accent);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
+ul.tick{margin:0;padding:0;list-style:none}
+ul.tick li{position:relative;padding:0 0 10px 30px;font-size:18.5px}
+ul.tick li::before{content:'';position:absolute;left:4px;top:10px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+b.btn,span.btn{display:inline-block;font-weight:600;font-size:.88em;padding:1px 9px;border:1px solid #c8c4b8;border-radius:6px;background:#fff;white-space:nowrap}
+b.go{background:var(--accent);color:#fff;border-color:var(--accent)}
+.url{font-family:Consolas,'Courier New',monospace;font-size:28px;font-weight:700;color:var(--accent);background:#fff;border:2px solid var(--accent);
+ border-radius:10px;padding:12px 20px;display:inline-block;text-decoration:none}
+.url:hover{background:var(--accent2)}
+a.lk{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.cover a.lk{color:#fff}
+a.sheet{display:inline-flex;align-items:center;gap:12px;background:#1e8e3e;color:#fff;text-decoration:none;font-weight:700;font-size:20px;
+ border-radius:10px;padding:12px 22px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+a.sheet:hover{filter:brightness(1.1)}
+a.sheet i{width:26px;height:30px;border-radius:4px;background:#fff;position:relative;flex:none}
+a.sheet i::after{content:'';position:absolute;left:5px;right:5px;top:8px;height:14px;
+ background:linear-gradient(#1e8e3e 0 0) 0 0/100% 2px no-repeat,linear-gradient(#1e8e3e 0 0) 0 6px/100% 2px no-repeat,
+ linear-gradient(#1e8e3e 0 0) 0 12px/100% 2px no-repeat,linear-gradient(#1e8e3e 0 0) 50% 0/2px 100% no-repeat}
+.cover ol.steps li{color:#e6edf4}.cover ol.steps li::before{background:rgba(255,255,255,.15);color:#fff}
+.small{font-size:15px!important;color:var(--mute)}
+.note{background:#fff8e6;border:1px solid #eedc9e;border-radius:10px;padding:12px 16px;font-size:16.5px}
+.note b{color:#7a5a00}
+table.msg{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:16px}
+table.msg th{text-align:left;background:#ece9e1;padding:9px 14px;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--mute)}
+table.msg td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top;line-height:1.4}
+table.msg td:first-child{width:48%;font-style:italic;color:#3a4651}
+/* mock screens */
+.win{background:#fff;border:1px solid #cfcbc0;border-radius:12px;box-shadow:0 10px 30px rgba(22,32,43,.12);overflow:hidden}
+.win .bar{height:30px;background:#ece9e1;display:flex;align-items:center;gap:6px;padding:0 12px}
+.win .bar i{width:10px;height:10px;border-radius:50%;background:#cfcbc0}
+.win .bar span{margin-left:10px;font-size:12px;color:var(--mute);font-family:Consolas,monospace}
+.signin{padding:26px 34px 28px}
+.signin h4{margin:0 0 2px;font-size:21px}.signin .s{color:var(--mute);font-size:14px;margin-bottom:14px}
+.signin label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+.signin .in{border:1px solid #cfcbc0;border-radius:8px;height:36px;padding:7px 10px;font-size:14px;color:var(--mute)}
+.signin .b1{margin-top:16px;background:var(--accent);color:#fff;border-radius:8px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:600}
+.signin .b2{margin-top:8px;border:1px solid #cfcbc0;border-radius:8px;height:36px;display:flex;align-items:center;justify-content:center;font-size:14px;position:relative}
+.ring{outline:3px solid #f0a020;outline-offset:3px}
+.stepper{display:flex;align-items:center;gap:0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 18px}
+.stepper .st{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:22px;font-size:17px;color:var(--mute);white-space:nowrap}
+.stepper .st .n{width:28px;height:28px;border-radius:50%;border:2px solid #cfcbc0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.stepper .st.on{background:var(--accent2);color:var(--ink)}.stepper .st.on .n{border-color:var(--accent);color:var(--accent)}
+.stepper .sep{width:26px;height:2px;background:#d8d4ca}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:12px 26px}
+.legend div{display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.35}
+.legend i{flex:none;width:22px;height:22px;border-radius:6px;margin-top:2px}
+.review{display:grid;grid-template-columns:150px 1fr 190px;height:300px;font-size:12px}
+.review .l,.review .r{background:#fbfaf7;padding:10px;border-right:1px solid var(--line)}
+.review .r{border-right:0;border-left:1px solid var(--line)}
+.review .c{position:relative;background:#fff}
+.review .t{font-weight:700;font-size:11px;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+.review .it{background:#fff;border:1px solid var(--line);border-radius:5px;padding:4px 6px;margin-bottom:5px}
+.tag{position:absolute;background:var(--ink);color:#fff;font-size:12px;font-weight:700;border-radius:12px;padding:3px 9px}
+.cover{background:linear-gradient(135deg,#16202B 0%,#1d3550 60%,#1f6fb2 100%);color:#fff}
+.cover .lead{color:#c9d6e3}.cover .kicker{color:#8fc1ec}.cover .foot{color:#9fb0c0}
+.chip{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:6px 14px;font-size:16px;margin:0 8px 8px 0}
+.dl{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.dl .card{display:flex;gap:14px;align-items:flex-start;padding:16px 18px}
+.dl .ext{flex:none;width:58px;height:58px;border-radius:10px;background:var(--accent2);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+/* navigation */
+#nav{position:fixed;right:16px;bottom:12px;display:flex;gap:6px;align-items:center;color:#c9d0d6;font-size:13px;z-index:5}
+#nav button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 11px;cursor:pointer;font:inherit}
+#nav button:hover{background:rgba(255,255,255,.22)}
+#hintk{position:fixed;left:16px;bottom:12px;color:#9aa6b0;font-size:12px}
+#nav,#hintk{opacity:0;transition:opacity .3s}body.ui #nav,body.ui #hintk{opacity:1}
+@media print{
+ @page{size:1280px 720px;margin:0}
+ html,body{background:#fff}
+ #stage{position:static;display:block}
+ .slide{display:block!important;position:relative;transform:none!important;page-break-after:always;break-after:page;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+ #nav,#hintk{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1 -->
+<section class="slide cover" id="welcome">
+ <div style="margin-top:70px"><div class="logo" style="font-size:20px"><i></i>CAD to Revit</div></div>
+ <h1 style="font-size:60px;margin-top:40px;max-width:1000px">Structural CAD drawings to a Revit model: checked, not redrawn</h1>
+ <p class="lead" style="font-size:23px;max-width:900px">A guide for the team: what the app does, how to sign in, and how to take a job from drawings to model.</p>
+ <div style="margin-top:34px"><span class="chip">Runs in your browser</span><span class="chip">Nothing to install</span><span class="chip">Your own projects</span><span class="chip">Never guesses a size</span></div>
+ <div class="foot"><span>Team guide · October 2026</span><span>Use ← → to move through the slides</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide" id="what">
+ <div class="kicker">What it is</div>
+ <h2>The app reads the structural drawings and builds the model for you</h2>
+ <p class="lead">You give it a job's DWG or DXF drawings. It finds the columns, beams, slabs and walls, reads their marks and sizes, and builds the model in Revit, IFC or Rhino. You check the result.</p>
+ <div class="cols3">
+  <div class="card"><div class="num">1</div><h3>Reads any consultant's drawings</h3><p>Plans, schedules, details and sections. Each value is matched to the mark it belongs to, whatever the layer names or label style.</p></div>
+  <div class="card"><div class="num">2</div><h3>Shows where every value came from</h3><p>Click any beam, column or slab to see its size and the drawing it came from. Where the drawings disagree, or say nothing, the app marks it for you to decide.</p></div>
+  <div class="card"><div class="num">3</div><h3>Builds the model</h3><p>Download a Revit file, an IFC file, a Rhino file, or a package for whoever builds the model. Your decisions go into it.</p></div>
+ </div>
+ <div class="note" style="margin-top:26px"><b>The one rule:</b> the app never guesses. A size that is not clear in the drawings is shown for you to decide. It is never filled in quietly.</div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>2</span></div>
+</section>
+
+<!-- 3 -->
+<section class="slide" id="steps">
+ <div class="kicker">The whole job in four steps</div>
+ <h2>The four steps across the top of the app</h2>
+ <p class="lead">Click a step to go to it. A step you can't use yet tells you what to do first.</p>
+ <div class="stepper" style="margin-bottom:30px">
+  <div class="st on"><span class="n">1</span>Import CAD</div><div class="sep"></div>
+  <div class="st"><span class="n">2</span>Analyse</div><div class="sep"></div>
+  <div class="st"><span class="n">3</span>Review</div><div class="sep"></div>
+  <div class="st"><span class="n">4</span>Export to Revit</div>
+  <span style="margin-left:auto;font-size:14px;color:var(--mute)">you@office.com · <u style="color:var(--accent)">Sign out</u> &nbsp; <b class="btn">Help</b></span>
+ </div>
+ <div class="cols4">
+  <div class="card"><h3>1 · Import CAD</h3><p>Upload every structural drawing of the job.</p></div>
+  <div class="card"><h3>2 · Analyse</h3><p>Tick the floors, name them as in Revit, press Analyse.</p></div>
+  <div class="card"><h3>3 · Review</h3><p>Look over the plan and 3D. Decide anything in red or yellow.</p></div>
+  <div class="card"><h3>4 · Export</h3><p>Download the Revit, IFC or Rhino file, or a package.</p></div>
+ </div>
+ <p class="small" style="margin-top:22px">The project name at the top left (click <b>change</b>) takes you back to the start page and your list of projects.</p>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>3</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide" id="open">
+ <div class="kicker">Getting in</div>
+ <h2>Open the app in your browser</h2>
+ <p class="lead">The app runs on one office PC, and you use it from your own PC through Chrome or Edge. Nothing is installed or copied to your PC.</p>
+ <a class="url" href="http://DESKTOP-1B6U4I7:8770/" target="_blank" rel="noopener">http://DESKTOP-1B6U4I7:8770/</a>
+ <p class="small" style="margin-top:12px">If that link does not open, try <a class="lk" href="http://192.168.1.36:8770/" target="_blank" rel="noopener" style="font-family:Consolas,monospace;font-weight:700">http://192.168.1.36:8770/</a></p>
+ <div class="cols" style="margin-top:28px">
+  <ul class="tick">
+   <li>You need to be on the <b>office network</b>, at the office.</li>
+   <li><b>Bookmark</b> the page so you can open it again easily.</li>
+   <li>It only opens while the app is running. If neither link works, it is switched off, so let us know.</li>
+  </ul>
+  <ul class="tick">
+   <li>Sign in with your <b>office e-mail address</b>, the one you were given access with.</li>
+   <li>The first time, you choose your own password (next slide).</li>
+   <li>Your projects are your own. Other team members don't see them.</li>
+  </ul>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>4</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide" id="password">
+ <div class="kicker">First time only</div>
+ <h2>Set your password</h2>
+ <div class="cols" style="grid-template-columns:1.15fr 1fr;margin-top:18px;align-items:start">
+  <ol class="steps">
+   <li>Open the app link. Type your <b>e-mail</b> and leave the password empty.</li>
+   <li>Press <b class="btn">Set or reset my password</b>.</li>
+   <li>An e-mail <i>“Set your CAD to Revit password”</i> arrives. Check <b>Spam</b> if you don't see it.</li>
+   <li>Open its link within <b>30 minutes</b>. Each link works only once.</li>
+   <li>Type a password of <b>at least 8 characters</b> twice, then press <b class="btn">Save password</b>.</li>
+   <li>Press <b>Sign in now</b> and sign in with your e-mail and the new password.</li>
+  </ol>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>DESKTOP-1B6U4I7:8770</span></div>
+   <div class="signin"><h4>CAD to Revit</h4><div class="s">Sign in with your e-mail and password.</div>
+    <label>E-mail</label><div class="in">you@office.com</div>
+    <label>Password</label><div class="in">••••••••</div>
+    <div class="b1">Sign in</div>
+    <div class="b2 ring">Set or reset my password</div>
+   </div></div>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>5</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide" id="signin">
+ <div class="kicker">Signing in</div>
+ <h2>Every day after that: e-mail, password, <span style="color:var(--accent)">Sign in</span></h2>
+ <p class="lead">Your browser keeps you signed in until you press <b>Sign out</b> (top right), or after 30 days without using the app. Always sign out on a shared PC.</p>
+ <table class="msg">
+  <tr><th>If the sign-in page says…</th><th>What to do</th></tr>
+  <tr><td>No password is set for this e-mail yet.</td><td>Press <b class="btn">Set or reset my password</b> and follow the e-mail (slide 5).</td></tr>
+  <tr><td>The e-mail or password is not right.</td><td>Check for typing mistakes and Caps Lock. Use the full e-mail address.</td></tr>
+  <tr><td>Too many wrong passwords. Try again in … minutes.</td><td>After 5 wrong tries sign-in pauses for 15 minutes. Wait, or reset your password.</td></tr>
+  <tr><td>This e-mail is not approved to use CAD to Revit yet.</td><td>Your access is still being set up. You'll get an e-mail when you can sign in.</td></tr>
+  <tr><td>Your access ended on …</td><td>Let us know and it will be renewed.</td></tr>
+  <tr><td>This link is out of date or was already used.</td><td>Ask for a new link with <b class="btn">Set or reset my password</b>.</td></tr>
+ </table>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>6</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide" id="start">
+ <div class="kicker">The start page</div>
+ <h2>Start a job, or carry on with one</h2>
+ <p class="lead">This is the first page after you sign in. Make one project per job (or per building in a job). It keeps the drawings, your decisions and the results together.</p>
+ <div class="cols3">
+  <div class="card"><h3>New project</h3><p>Type the job's name, for example <i>Hotel Main Block</i>, then press <b class="btn">Create</b>. It is saved with your other projects.</p></div>
+  <div class="card"><h3>Try a sample</h3><p>A small made-up drawing set, for trying the app out before a real job. A good first thing to do.</p></div>
+  <div class="card"><h3>Your recent projects</h3><p>Listed under the tiles. Click one to carry on where you left off. Your decisions are already in it.</p></div>
+ </div>
+ <div class="note" style="margin-top:28px"><b>Tip:</b> new drawing revision for the same job? Open the project, go to <b>Import CAD</b> and press <b class="btn">Start a new drawing set</b>. Nothing is deleted. The earlier results and your decisions are kept.</div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>7</span></div>
+</section>
+
+<!-- 8 -->
+<section class="slide" id="import">
+ <div class="kicker">Step 1</div>
+ <h2>Import CAD: upload the drawings</h2>
+ <p class="lead">Add every structural drawing of the job: DWG or DXF, from any consultant.</p>
+ <div class="cols" style="align-items:start">
+  <ol class="steps">
+   <li>Press <b class="btn go">Add drawings...</b> to pick files, or <b class="btn">Add a whole folder...</b></li>
+   <li>Wait for <i>“Uploading 3 of 8 …”</i> to finish. Each drawing then appears in the list.</li>
+   <li>Added one by mistake? Press the <b>×</b> beside it.</li>
+   <li>Press <b class="btn go">Continue to Analyse →</b></li>
+  </ol>
+  <div class="card">
+   <h3>Add more than the plans</h3>
+   <p style="margin-bottom:10px">Schedules, beam and column details and sections are where many sizes are written. The more of the set you add, the fewer values you'll have to fill in yourself.</p>
+   <p>Only DWG and DXF files are taken. Anything else in a folder is skipped.</p>
+  </div>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>8</span></div>
+</section>
+
+<!-- 9 -->
+<section class="slide" id="analyse">
+ <div class="kicker">Step 2</div>
+ <h2>Analyse: tell it the floors, then let it read</h2>
+ <p class="lead">The app ticks the floors it finds in the drawing names. Check them, then analyse.</p>
+ <div class="cols" style="align-items:start">
+  <ol class="steps">
+   <li><b>Floors:</b> tick every floor the building has. Use <b>Ground up to</b> to tick a range at once.</li>
+   <li><b>Names:</b> pick each floor's Revit name, or use <b class="btn">Level 0, 1, 2 ...</b> / <b class="btn">Ground, First, Second ...</b></li>
+   <li><b>Heights:</b> type each level's height in mm from the drawings' ±0, or type one floor-to-floor height and press <b class="btn">Fill heights</b>.</li>
+   <li>Press <b class="btn go">Analyse drawings</b>.</li>
+  </ol>
+  <div>
+   <div class="card" style="margin-bottom:14px"><h3>While it works</h3><p>A bar shows each stage: <i>Preparing → Reading drawings → Linking and checking → Writing the review → Writing Revit files → Done</i>. A full set takes a few minutes. <b>Show details</b> has the full log.</p></div>
+   <div class="card"><h3>New consultant?</h3><p>Tick <i>“Let the app work out what unfamiliar layers hold”</i>. You will check what it found in Review.</p></div>
+  </div>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>9</span></div>
+</section>
+
+<!-- 10 -->
+<section class="slide" id="review">
+ <div class="kicker">Step 3</div>
+ <h2>Review: the plan, coloured by how sure the app is</h2>
+ <div class="cols" style="grid-template-columns:1.05fr 1fr;margin-top:16px;align-items:start">
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>Structure review</span></div>
+   <div style="display:flex;gap:6px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px">
+    <span style="border:1px solid #16202B;background:#16202B;color:#fff;border-radius:4px 0 0 4px;padding:1px 8px">Plan</span><span style="border:1px solid #cfcbc0;border-radius:0 4px 4px 0;padding:1px 8px;margin-left:-6px">3D</span>
+    <span style="margin-left:8px;color:var(--mute)">Level <b style="color:var(--ink)">L3 ▾</b> · ☑ CAD underneath</span></div>
+   <div class="review">
+    <div class="l"><div class="t">Plans</div><div class="it"><b>L1</b> · 1st floor</div><div class="it"><b>L2</b> · 2nd floor</div><div class="t" style="margin-top:10px">Issues</div><div class="it" style="border-left:3px solid var(--bad)">B12 sizes disagree</div><div class="it" style="border-left:3px solid var(--miss)">S3: no thickness</div></div>
+    <div class="c"><svg viewBox="0 0 300 250" width="100%" height="100%">
+      <rect x="40" y="40" width="220" height="170" fill="#2e8b57" fill-opacity=".12"/>
+      <rect x="40" y="125" width="110" height="85" fill="#c9a600" fill-opacity=".25"/>
+      <g stroke-width="7"><line x1="40" y1="40" x2="260" y2="40" stroke="#2e8b57"/><line x1="40" y1="210" x2="260" y2="210" stroke="#2e8b57"/>
+      <line x1="40" y1="40" x2="40" y2="210" stroke="#2e8b57"/><line x1="260" y1="40" x2="260" y2="210" stroke="#7b5fb4"/>
+      <line x1="150" y1="40" x2="150" y2="210" stroke="#c0392b"/><line x1="40" y1="125" x2="260" y2="125" stroke="#d98a1c"/></g>
+      <g fill="#2e8b57"><rect x="33" y="33" width="14" height="14"/><rect x="253" y="33" width="14" height="14"/><rect x="33" y="203" width="14" height="14"/><rect x="253" y="203" width="14" height="14"/><rect x="143" y="33" width="14" height="14"/><rect x="143" y="203" width="14" height="14"/></g>
+     </svg></div>
+    <div class="r"><div class="t">B12 · conflict</div><div style="font-size:11px;line-height:1.5">width 230<br>depth <b style="color:var(--bad)">600 / 450</b><br><span style="color:var(--mute)">plan label “B12(230X600)” <u>use</u><br>schedule row “B12 230x450” <u>use</u></span><div style="margin-top:6px;border:1px solid var(--line);border-radius:4px;padding:2px 5px;color:var(--mute)">set …</div></div></div>
+   </div></div>
+  <div>
+   <div class="legend">
+    <div><i style="background:var(--ok)"></i><span><b>Green</b>: read, and the sources agree</span></div>
+    <div><i style="background:var(--bad)"></i><span><b>Red</b>: the drawings disagree. You decide.</span></div>
+    <div><i style="background:var(--miss)"></i><span><b>Yellow</b>: missing. No drawing gives this value.</span></div>
+    <div><i style="background:var(--low)"></i><span><b>Orange</b>: read with low confidence. Worth a look.</span></div>
+    <div><i style="background:var(--dec)"></i><span><b>Purple</b>: decided by you</span></div>
+    <div><i style="background:var(--grey)"></i><span><b>Grey</b>: left out of the model</span></div>
+   </div>
+   <ul class="tick" style="margin-top:22px">
+    <li><b>Plan / 3D</b> at the top. <b>Level</b> picks the floor.</li>
+    <li><b>CAD underneath</b> shows the drawing's own lines. <span style="color:#e67e22;font-weight:600">Orange dashed</span> outlines were drawn but are not in the model, so check them.</li>
+    <li>Scroll to zoom, drag to move, hover for the mark and size.</li>
+   </ul>
+  </div>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>10</span></div>
+</section>
+
+<!-- 11 -->
+<section class="slide" id="decide">
+ <div class="kicker">Step 3 · making decisions</div>
+ <h2>Click an element, check its sources, decide</h2>
+ <p class="lead">The panel on the right lists each value (width, depth, thickness, mark …) with every drawing it was read from.</p>
+ <div class="cols" style="align-items:start">
+  <ol class="steps">
+   <li>Click a beam, column or slab, or an item in the <b>Issues</b> list on the left.</li>
+   <li>Press <b class="btn">use</b> beside the source you trust, <i>or</i> type the value in the <b>set</b> box and press <b class="btn go">Save typed values</b>.</li>
+   <li><b>Apply to:</b> <i>this element only</i>, or <i>every B12 on level 3</i>. One decision fixes them all.</li>
+   <li>Not a real element? <b class="btn">Exclude from model</b>. Changed your mind? <b class="btn">Undo decisions here</b>.</li>
+   <li>When you're done, press <b class="btn go">Done - Export →</b></li>
+  </ol>
+  <div>
+   <div class="card" style="margin-bottom:14px"><h3>Saved as you go</h3><p>Every decision is saved in your project immediately (<i>“saved in the project automatically”</i>). Closing the browser loses nothing. The next analysis of the same project keeps your decisions.</p></div>
+   <div class="card" style="margin-bottom:14px"><h3>Sizes are in millimetres</h3><p>Type numbers only, e.g. <b>600</b>, not 600mm. The app refuses a size that isn't a number above 0.</p></div>
+   <div class="card"><h3>Unfamiliar marks</h3><p><b>mark prefix</b> in Issues: the app read a consultant's own marks (e.g. SL1) from their schedules. Confirm with <b class="btn">beam</b> <b class="btn">slab</b> …, then press Analyse again. <b>did you mean</b>: a mark written two ways (S01 / S1). It is never matched by itself.</p></div>
+  </div>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>11</span></div>
+</section>
+
+<!-- 12 -->
+<section class="slide" id="export">
+ <div class="kicker">Step 4</div>
+ <h2>Export: check, then download your model</h2>
+ <p class="lead">Press <b class="btn go">Export to Revit</b>. The <b>Before you build</b> panel then shows what goes to the model and what is still waiting for you.</p>
+ <div class="cols" style="grid-template-columns:1fr 1.25fr;align-items:start">
+  <div>
+   <ul class="tick">
+    <li><b>Needs a decision:</b> not built until you decide it in Review. You can also tick <i>“Build these anyway at a working size”</i>: they are built in <span style="color:var(--bad);font-weight:600">red</span>, with the reason in their Comments.</li>
+    <li><b>Not built by the app yet:</b> model these by hand for now.</li>
+    <li><b>Floor levels:</b> fill in any missing heights, then <b class="btn go">Save and update the Revit files</b>.</li>
+   </ul>
+  </div>
+  <div class="dl">
+   <div class="card"><div class="ext">.rvt</div><div><h3>Revit file</h3><p><b class="btn">Create Revit file</b>, then <b>Download</b>. The model is built into a new Revit project.</p></div></div>
+   <div class="card"><div class="ext">.ifc</div><div><h3>IFC file</h3><p>The same model in the open BIM format. Revit: File › Open › IFC.</p></div></div>
+   <div class="card"><div class="ext">.3dm</div><div><h3>Rhino file</h3><p>A layer for each level and type. Anything still undecided is red.</p></div></div>
+   <div class="card"><div class="ext">.zip</div><div><h3>Revit package</h3><p>Revit files, review page and summary, for whoever builds the model.</p></div></div>
+  </div>
+ </div>
+ <p class="small" style="margin-top:16px"><b>Also</b>, at the bottom of the page: <b>Review workbook (Excel)</b> lists every element and value · <b>3D view in its own tab</b> · <b>Summary</b> lists what needs a decision, in order.</p>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>12</span></div>
+</section>
+
+<!-- 13 -->
+<section class="slide" id="builds">
+ <div class="kicker">Know what to expect</div>
+ <h2>What goes into the model</h2>
+ <div class="cols" style="margin-top:22px;align-items:start">
+  <div class="card"><h3 style="color:var(--ok)">Built by the app</h3>
+   <ul class="tick" style="margin-top:10px">
+    <li>Columns: position, size and rotation, floor by floor</li>
+    <li>Beams: straight and curved, at their marked sizes</li>
+    <li>Slabs: with cut-outs, thickness and sunk areas</li>
+    <li>Walls and lift cores</li>
+    <li>Levels at the heights you gave</li>
+   </ul></div>
+  <div class="card"><h3 style="color:var(--bad)">Check, or do by hand</h3>
+   <ul class="tick" style="margin-top:10px">
+    <li>Anything on the <b>Not built by the app yet</b> list on the Export page</li>
+    <li>Anything left red or yellow in Review: not built, or built red if you chose so</li>
+    <li>Reinforcement: listed in the Excel workbook, never modelled</li>
+    <li>Always compare the model with the drawings before you issue it</li>
+   </ul></div>
+ </div>
+ <div class="note" style="margin-top:24px"><b>Remember:</b> the app speeds up modelling. It does not replace your check. If something looks wrong, it is usually something the drawing doesn't say clearly. Review will show you where.</div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>13</span></div>
+</section>
+
+<!-- 14 -->
+<section class="slide" id="tips">
+ <div class="kicker">Good habits</div>
+ <h2>Tips for a smooth job</h2>
+ <div class="cols" style="margin-top:22px">
+  <ul class="tick">
+   <li><b>One project per job</b> (or per building). Name it clearly.</li>
+   <li><b>Add the whole set</b>, not just the plans. Schedules and details fill in the sizes.</li>
+   <li><b>Work through the Issues list</b> top to bottom. It is quicker than hunting on the plan.</li>
+   <li><b>Decide by mark</b> (<i>every B12 on level 3</i>) when the same answer fits them all.</li>
+  </ul>
+  <ul class="tick">
+   <li><b>New revision?</b> Use <b class="btn">Start a new drawing set</b> in the same project. Your decisions carry over.</li>
+   <li><b>Press Analyse again</b> after changing floors or adding drawings, then export again.</li>
+   <li><b>Use the Help button</b> (top right) for a quick reminder of the four steps.</li>
+   <li><b>Sign out</b> when you're done on a shared PC.</li>
+  </ul>
+ </div>
+ <div class="foot"><span class="logo"><i></i>CAD to Revit · Team guide</span><span>14</span></div>
+</section>
+
+<!-- 15 -->
+<section class="slide cover" id="help">
+ <div class="kicker" style="margin-top:6px">Need help?</div>
+ <h1 style="font-size:44px;margin-bottom:8px">Found something wrong, or stuck?</h1>
+ <p class="lead" style="font-size:20px;max-width:1000px;margin-bottom:18px">Write it in the team issues sheet, so every issue is in one place and nothing gets lost.</p>
+ <a class="sheet" href="https://docs.google.com/spreadsheets/d/1VJh6xAU9j_JeeLb4shm4b3iZGgynWa3-mIllMAJtcms/edit?gid=0#gid=0" target="_blank" rel="noopener"><i></i>Open the CAD to Revit issues sheet</a>
+ <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:24px;align-items:start;gap:28px">
+  <ol class="steps">
+   <li>Open the sheet with the green button above.</li>
+   <li>Make <b style="color:#fff">your own tab</b>: press <b style="color:#fff">+</b> at the bottom left, then double-click the new tab and rename it to <b style="color:#fff">your name</b>.</li>
+   <li>Write <b style="color:#fff">one issue per row</b> on your tab, with the details on the right.</li>
+   <li>Add new issues to the same tab each time.</li>
+  </ol>
+  <div class="card" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);padding:16px 20px">
+   <h3 style="color:#fff;font-size:18px;margin-bottom:8px">What to write in each row</h3>
+   <p style="color:#c9d6e3;font-size:16px;line-height:1.6">
+    <b style="color:#fff">Date</b><br>
+    <b style="color:#fff">Project</b>: its name, and the drawing or floor<br>
+    <b style="color:#fff">Element</b>: its mark, e.g. B47<br>
+    <b style="color:#fff">The issue</b>: what you see, and what you expected<br>
+    <b style="color:#fff">Screenshot</b>: of the Review plan or model, with the place circled</p>
+  </div>
+ </div>
+ <p style="margin-top:20px;color:#c9d6e3;font-size:17px">App link: <a class="lk" href="http://DESKTOP-1B6U4I7:8770/" target="_blank" rel="noopener" style="font-family:Consolas,monospace;font-weight:700">http://DESKTOP-1B6U4I7:8770/</a></p>
+ <div class="foot"><span>CAD to Revit · Team guide</span><span>15</span></div>
+</section>
+
+</div>
+<div id="hintk">← → or click to move · F11 full screen · Ctrl+P to save as PDF</div>
+<div id="nav"><button id="prev" aria-label="Previous slide">‹</button><span id="pos"></span><button id="next" aria-label="Next slide">›</button></div>
+<script>
+const S=[...document.querySelectorAll('.slide')];let i=0;
+function fit(){const k=Math.min(innerWidth/1280,innerHeight/720);S.forEach(s=>s.style.transform='scale('+k+')')}
+function show(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach((s,j)=>s.classList.toggle('on',j===i));
+ document.getElementById('pos').textContent=(i+1)+' / '+S.length;history.replaceState(null,'','#'+S[i].id)}
+addEventListener('resize',fit);
+addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();show(i+1)}
+ else if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){e.preventDefault();show(i-1)}
+ else if(e.key==='Home')show(0);else if(e.key==='End')show(S.length-1)});
+document.getElementById('stage').addEventListener('click',e=>{if(e.target.closest('a,button'))return;show(e.clientX<innerWidth/3?i-1:i+1)});
+document.getElementById('prev').onclick=()=>show(i-1);document.getElementById('next').onclick=()=>show(i+1);
+let uiT;addEventListener('mousemove',()=>{document.body.classList.add('ui');clearTimeout(uiT);uiT=setTimeout(()=>document.body.classList.remove('ui'),2500)});
+const h=location.hash.slice(1),hi=S.findIndex(s=>s.id===h);fit();show(hi>=0?hi:0);
+</script>
+</body>
+</html>

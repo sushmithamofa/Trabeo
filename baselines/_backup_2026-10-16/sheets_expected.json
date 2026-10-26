@@ -1,0 +1,475 @@
+{
+ "01_08_2026_1153 - 1ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M1": {
+  "entities": 2068,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "R.C.C. PLAN @ WING B 1ST FLOOR.",
+  "wing": "B"
+ },
+ "01_08_2026_1153 - 1ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M2": {
+  "entities": 391,
+  "kind": "slab_schedule",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "SCHEDULE OF SLAB WING B 1ST FLOOR:-",
+  "wing": "B"
+ },
+ "01_08_2026_1153 - 1ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M3": {
+  "entities": 58,
+  "kind": "legend",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "100MM SUNK",
+  "wing": "B"
+ },
+ "01_08_2026_1153 - 3ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M1": {
+  "entities": 2068,
+  "kind": "framing_plan",
+  "level_conflict": true,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "R.C.C. PLAN @ WING B 1ST FLOOR.",
+  "wing": "B"
+ },
+ "01_08_2026_1153 - 3ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M2": {
+  "entities": 391,
+  "kind": "slab_schedule",
+  "level_conflict": true,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "SCHEDULE OF SLAB WING B 1ST FLOOR:-",
+  "wing": "B"
+ },
+ "01_08_2026_1153 - 3ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg M3": {
+  "entities": 58,
+  "kind": "legend",
+  "level_conflict": false,
+  "levels": [
+   "L3"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "100MM SUNK",
+  "wing": "B"
+ },
+ "04_01_2026_B BLOCK FOUNDATION.dwg M1": {
+  "entities": 739,
+  "kind": "foundation_plan",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "R.C.C. PLAN @ FOUNDATION LEVEL ( B WING)",
+  "wing": "B"
+ },
+ "08_09_2026_1153 - 2ND FLOOR PLAN ( B WING )dwg.dwg M1": {
+  "entities": 2473,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L2"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "PLAN SHOWING",
+  "wing": "B"
+ },
+ "08_09_2026_1153 - 2ND FLOOR PLAN ( B WING )dwg.dwg M2": {
+  "entities": 58,
+  "kind": "legend",
+  "level_conflict": false,
+  "levels": [
+   "L2"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "100MM SUNK",
+  "wing": "B"
+ },
+ "08_09_2026_1153 - 4ND FLOOR PLAN ( B WING )dwg.dwg M1": {
+  "entities": 2473,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L4"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "PLAN SHOWING",
+  "wing": "B"
+ },
+ "08_09_2026_1153 - 4ND FLOOR PLAN ( B WING )dwg.dwg M2": {
+  "entities": 58,
+  "kind": "legend",
+  "level_conflict": false,
+  "levels": [
+   "L4"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "100MM SUNK",
+  "wing": "B"
+ },
+ "MAIN BLOCK - SASANGIR_ COLUMN & FOUNDATION.dwg COL LAY#2": {
+  "entities": 526,
+  "kind": "column_layout",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "COLUMN SHEARWALL LAYOUT",
+  "wing": "MAIN"
+ },
+ "MAIN BLOCK - SASANGIR_ COLUMN & FOUNDATION.dwg COL SCH#2": {
+  "entities": 4192,
+  "kind": "column_schedule",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "FOUNDATION",
+  "wing": "MAIN"
+ },
+ "MAIN BLOCK - SASANGIR_ COLUMN & FOUNDATION.dwg FDN LAYOUT#2": {
+  "entities": 2591,
+  "kind": "foundation_plan",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "DIMENSIONAL PLAN OF RAFT-1",
+  "wing": "MAIN"
+ },
+ "MAIN BLOCK - TERRACE LVL FRAMING & BEAM DETAILS.dwg DETAILS-1 (2)#2": {
+  "entities": 1446,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "TERRACE"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STR. BEAM DETAILS AT TERRACE LEVEL",
+  "wing": "MAIN"
+ },
+ "MAIN BLOCK - TERRACE LVL FRAMING & BEAM DETAILS.dwg DETAILS-1#2": {
+  "entities": 2003,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "TERRACE"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STR. BEAM DETAILS AT TERRACE LEVEL",
+  "wing": "MAIN"
+ },
+ "MAIN BLOCK - TERRACE LVL FRAMING & BEAM DETAILS.dwg FRAMING#2": {
+  "entities": 1289,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "TERRACE"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STRUCTURAL LAY-OUT AT TERRACE LVL.",
+  "wing": "MAIN"
+ },
+ "MOFA STRUCTURE LEGENDS.dwg M1": {
+  "entities": 58,
+  "kind": "legend",
+  "level_conflict": false,
+  "levels": [],
+  "same_as": "",
+  "source": "model region",
+  "title": "100MM SUNK",
+  "wing": ""
+ },
+ "PLINTH BEAM LAYOUT.dwg COL LAY#1": {
+  "entities": 1819,
+  "kind": "framing_plan",
+  "level_conflict": true,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STRU. LAYOUT AT GROUND LVL.",
+  "wing": ""
+ },
+ "PLINTH BEAM LAYOUT.dwg Layout1#2": {
+  "entities": 2580,
+  "kind": "overview",
+  "level_conflict": true,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "overview",
+  "title": "STRU. LAYOUT AT GROUND LVL.",
+  "wing": ""
+ },
+ "PLINTH BEAM LAYOUT.dwg Layout3-COL LAY#2": {
+  "entities": 1046,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "PLINTH"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "SECTION: C-C",
+  "wing": ""
+ },
+ "SASANGIR HOTEL_1st  FLOOR LVL_REVISION.dwg M1": {
+  "entities": 2076,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "model region",
+  "title": "STRUCTURAL LAY-OUT AT FIRST FLOOR LVL.",
+  "wing": ""
+ },
+ "VILLA5.dwg FLOOR PLANS#7": {
+  "entities": 86,
+  "kind": "column_layout",
+  "level_conflict": false,
+  "levels": [],
+  "same_as": "",
+  "source": "viewport",
+  "title": "FLOOR PLANS",
+  "wing": ""
+ },
+ "VILLA5.dwg STRUCTURAL#2": {
+  "entities": 155,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "GF",
+   "PLINTH"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "GROUND FLOOR PLINTH BEAM & SLAB LAYOUT",
+  "wing": ""
+ },
+ "VILLA5.dwg STRUCTURAL#3": {
+  "entities": 194,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "FIRST FLOOR BEAM & SLAB LAYOUT",
+  "wing": ""
+ },
+ "VILLA5.dwg STRUCTURAL#4": {
+  "entities": 86,
+  "kind": "column_layout",
+  "level_conflict": false,
+  "levels": [],
+  "same_as": "FLOOR PLANS#7",
+  "source": "viewport",
+  "title": "FACE LINE DRAWING",
+  "wing": ""
+ },
+ "VILLA5.dwg U1": {
+  "entities": 3926,
+  "kind": "column_details",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "RAFT LAYOUT",
+  "wing": ""
+ },
+ "VILLA5.dwg U10": {
+  "entities": 171,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "GROUND FLOOR BEAM LAYOUT",
+  "wing": ""
+ },
+ "VILLA5.dwg U11": {
+  "entities": 86,
+  "kind": "slab_schedule",
+  "level_conflict": false,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "SLAB SCHEDULE (M25 : FE415) (LEVEL : GROUND FLOOR)",
+  "wing": ""
+ },
+ "VILLA5.dwg U2": {
+  "entities": 738,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "FIRST FLOOR BEAM DEATILS",
+  "wing": ""
+ },
+ "VILLA5.dwg U3": {
+  "entities": 701,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "PLINTH"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "PLINTH BEAM PLAN_V5",
+  "wing": ""
+ },
+ "VILLA5.dwg U4": {
+  "entities": 612,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "STAIRCASE DETAILS",
+  "wing": ""
+ },
+ "VILLA5.dwg U5": {
+  "entities": 536,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "RAFT LAYOUT",
+  "wing": ""
+ },
+ "VILLA5.dwg U6": {
+  "entities": 504,
+  "kind": "slab_schedule",
+  "level_conflict": false,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "SLAB SCHEDULE (M25 : FE415) (LEVEL : GROUND FLOOR)",
+  "wing": ""
+ },
+ "VILLA5.dwg U7": {
+  "entities": 496,
+  "kind": "footing_details",
+  "level_conflict": false,
+  "levels": [
+   "FDN"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "TYPICAL DETAIL OF RAFT",
+  "wing": ""
+ },
+ "VILLA5.dwg U8": {
+  "entities": 464,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "GF"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "GROUND FLOOR BEAM DEATILS",
+  "wing": ""
+ },
+ "VILLA5.dwg U9": {
+  "entities": 192,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L1"
+  ],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "FIRST FLOOR FRAMING PLAN",
+  "wing": ""
+ },
+ "rev SF lvl slab sasan 28-5-25.dwg DETAILS-1#2": {
+  "entities": 1673,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "L2"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STR. BEAM DETAILS AT 2ndFLOOR LEVEL",
+  "wing": ""
+ },
+ "rev SF lvl slab sasan 28-5-25.dwg DETAILS-2#2": {
+  "entities": 1679,
+  "kind": "beam_details",
+  "level_conflict": false,
+  "levels": [
+   "L2"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STR. BEAM DETAILS AT 2nd FLOOR LEVEL",
+  "wing": ""
+ },
+ "rev SF lvl slab sasan 28-5-25.dwg FRAMING#1": {
+  "entities": 2217,
+  "kind": "framing_plan",
+  "level_conflict": false,
+  "levels": [
+   "L2"
+  ],
+  "same_as": "",
+  "source": "viewport",
+  "title": "STRUCTURAL LAY-OUT AT SECOND FLOOR LVL.",
+  "wing": ""
+ }
+}

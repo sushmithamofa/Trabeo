@@ -1,0 +1,114 @@
+﻿mark,type,x1_local,y1_local,x2_local,y2_local,length_mm,width_mm,width_source,depth_mm,depth_source,centreline_source,offset_applied_mm,source_layer,tag_distance_mm,notes,handle
+,beam,26743.5,15448.8,26660.2,17796.3,2349.0,,schedule-required,,,as-drawn,0.0,BEAM,,"drawn as a plain line: centreline assumed, width from schedule",1960B8
+B1,beam,96.9,16848.7,7637.2,17122.0,7545.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.7,end extended 0 mm along its own line to reach its support,179988
+B10,beam,30686.0,15588.4,38341.1,15864.0,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,392.6,,1799B6
+B11,beam,3957.6,12842.6,7784.0,12987.0,3829.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,60.3,,1799B8
+B14,beam,23094.5,13521.6,26922.1,13657.4,3830.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799BF
+B15,beam,34577.5,13928.9,38404.9,14064.7,3829.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799C3
+B175,beam,-1849.4,4965.2,-1863.7,2885.3,2080.0,230.0,multiline,,,multiline-faces,115.0,BEAM,65.4,end extended 230 mm along its own line to reach its support; end extended 0 mm along its own line to reach its support,17A0E8
+B176,beam,-1852.2,4735.3,-1840.8,6815.2,2080.0,230.0,multiline,,,multiline-faces,115.0,BEAM,66.1,end extended 230 mm along its own line to reach its support; end extended 0 mm along its own line to reach its support,17A0E9
+B18,beam,30810.1,12095.0,26982.5,11959.3,3830.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799CA
+B19,beam,34637.7,12230.6,30810.1,12095.0,3830.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799C9
+B2,beam,7637.2,17121.9,15292.3,17393.5,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,17998A
+B20,beam,12564.3,10216.3,15543.2,10321.9,2980.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799E4
+B21,beam,15543.2,10321.9,18591.4,10430.0,3050.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799E9
+B21,beam,40606.6,1186.7,38970.8,1128.7,1636.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,58.0,,18A877
+B22,beam,30856.2,10795.0,29491.9,10746.7,1365.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,179A01
+B23,beam,32220.1,10843.4,30856.2,10795.1,1364.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,179A04
+B24,beam,34690.9,10731.0,38518.3,10866.7,3829.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799C6
+B25,beam,307.2,7680.2,4049.9,7811.3,3745.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,341.8,,1799CB
+B26,beam,15612.0,8383.1,11784.4,8247.4,3830.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799D2
+B27,beam,15612.0,8383.1,21353.2,8586.8,5744.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799D3
+B28,beam,27103.0,8560.6,30930.6,8696.4,3830.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799FB
+B29,beam,30930.6,8696.4,34758.1,8832.0,3829.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799FE
+B3,beam,22947.5,17664.6,15292.4,17393.1,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,17999E
+B30,beam,4078.3,7010.3,7991.1,7149.0,3915.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799CE
+B31,beam,11818.5,7285.3,7991.1,7149.6,3829.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799D1
+B32,beam,23300.8,7705.4,21386.9,7637.5,1915.1,230.0,multiline,450.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799F0
+B33,beam,27128.9,7828.4,23301.3,7692.6,3830.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799F9
+B34,beam,38611.6,8235.6,34784.1,8099.8,3830.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,138.8,,194931
+B37,beam,202.6,2875.1,8133.0,3150.3,7935.2,400.0,measured between the drawn faces,600.0,drawing schedule,face-pair,200.0,BEAM,85.1,two drawn faces merged into one beam; end extended 230 mm along its own line to reach its support,17AD31
+B38,beam,23440.3,3777.8,27267.7,3913.5,3829.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,304.2,,1799F8
+B39,beam,538.0,1174.3,4361.7,1309.9,3826.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799A4
+B4,beam,30602.7,17936.2,22947.5,17664.6,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,a leftover face line alongside this beam was dropped,17999D
+B40,beam,12022.3,1581.6,15848.5,1717.3,3828.6,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799A7
+B41,beam,15848.5,1717.3,19675.2,1853.1,3829.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799A9
+B42,beam,27331.2,2124.6,31159.1,2260.4,3830.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799AD
+B43,beam,31159.1,2260.4,34986.4,2396.2,3829.7,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,1799AE
+B44,beam,8251.8,-206.6,596.5,-474.6,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,42.9,,17998C
+B45,beam,15906.9,68.7,8251.8,-206.6,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,96.8,,17998D
+B46,beam,23562.2,336.4,15906.9,68.7,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,59.4,,17998E
+B47,beam,31217.4,608.1,23562.2,336.6,7660.0,230.0,multiline,1147.0,drawing schedule,multiline-faces,115.0,BEAM,59.6,,17998F
+B48,beam,38758.5,858.9,31217.4,608.4,7545.3,230.0,multiline,1136.0,drawing schedule,multiline-faces,115.0,BEAM,58.9,,179990
+B5,beam,38273.3,17773.3,30602.5,17943.0,7672.7,230.0,measured between the drawn faces,600.0,drawing schedule,face-pair,115.0,BEAM,47.7,two drawn faces merged into one beam,17999B
+B51,beam,558.7,589.6,408.1,4837.8,4250.9,230.0,drawing schedule (plan within 25 mm),600.0,drawing schedule,face-pair,114.9,BEAM,38.0,two drawn faces merged into one beam,179991
+B52,beam,222.7,10058.7,330.3,7028.5,3032.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,179985
+B53,beam,113.4,13142.7,222.7,10058.7,3086.0,230.0,multiline,900.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,run under floating column FC2 (525 mm longer),179986
+B54,beam,113.3,13142.7,22.3,15712.3,2571.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,run under floating column FC2 (525 mm longer),179987
+B55,beam,4302.0,3017.4,4419.5,-340.8,3360.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,78.6,,17A8DB
+B55A,beam,3982.4,9716.7,4219.8,3014.5,6706.4,400.0,multiline,600.0,drawing schedule,multiline-faces,200.0,BEAM,95.5,,17ABC2
+B56,beam,4050.3,10194.4,3894.7,14639.9,4448.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,37.8,,1799B7
+B57,beam,8213.8,877.7,8070.6,4908.8,4033.6,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 0 mm along its own line to reach its support,179993
+B58,beam,8070.6,4908.8,7878.3,10330.2,5424.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799CC
+B59,beam,7822.0,11915.6,7720.7,14774.0,2860.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,a leftover face line alongside this beam was dropped; end extended 115 mm along its own line to reach its support,179984
+B6,beam,7720.5,14773.8,65.0,14505.9,7660.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,359.8,,1799B2
+B60,beam,9799.3,4970.1,9719.8,7210.9,2242.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799DF
+B61,beam,11897.5,5044.5,12081.8,-68.9,5116.7,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.2,,1799A6
+B62,beam,11898.0,5044.5,11649.4,12053.4,7013.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799D0
+B63,beam,11635.8,12052.9,11548.6,14909.8,2858.2,230.0,multiline,750.0,drawing schedule,multiline-faces,115.0,BEAM,36.4,,1799BA
+B63,beam,39001.0,1129.8,39136.7,-2698.0,3830.2,230.0,measured between the drawn faces,750.0,drawing schedule,face-pair,115.0,BEAM,346.3,two drawn faces merged into one beam,18A824
+B64,beam,12633.0,8277.5,12498.0,12084.0,3808.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799E3
+B65,beam,14986.6,12173.6,15052.9,10304.5,1870.2,230.0,multiline,450.0,drawing schedule,multiline-faces,115.0,BEAM,41.5,,1799E5
+B66,beam,15868.6,1153.0,15725.7,5180.3,4029.9,230.0,multiline,,,multiline-faces,115.0,BEAM,38.0,end extended 0 mm along its own line to reach its support,1799A8
+B67,beam,15725.6,5180.3,15477.0,12189.2,7013.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799CF
+B68,beam,15477.1,12191.2,15375.8,15045.5,2856.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 115 mm along its own line to reach its support,1799BB
+B69,beam,16781.8,10365.9,16715.6,12233.1,1868.4,230.0,multiline,450.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799EA
+B7,beam,7720.7,14774.0,15375.6,15045.5,7659.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,326.1,,1799B3
+B70,beam,18660.1,8491.3,18525.1,12297.3,3808.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,289.7,,1799E7
+B71,beam,19733.7,202.6,19552.3,5316.1,5116.7,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799AA
+B72,beam,19553.2,5316.1,19439.5,8518.9,3204.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799D4
+B73,beam,19304.5,12324.9,19203.2,15181.3,2858.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799BC
+B74,beam,23524.0,1420.8,23380.9,5451.9,4033.6,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 0 mm along its own line to reach its support,1799AB
+B75,beam,23380.7,5451.9,23162.0,11620.2,6172.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799EF
+B76,beam,23132.1,12460.7,23034.9,15202.1,2743.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,a leftover face line alongside this beam was dropped,1799BD
+B77,beam,25198.7,3840.1,25060.2,7755.0,3917.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799FA
+B78,beam,27226.7,5068.8,27389.8,472.4,4599.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 1 mm along its own line to reach its support,1799AC
+B79,beam,27193.1,6017.7,26922.3,13657.4,7644.5,230.0,multiline,700.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799B1
+B8,beam,15375.8,15045.5,23030.8,15317.1,7659.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,369.7,,1799B4
+B80,beam,26922.1,13657.4,26858.4,15452.8,1796.6,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799C0
+B82,beam,29445.8,12046.6,29566.3,8648.0,3400.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799FF
+B83,beam,31179.2,1692.5,31036.2,5723.4,4033.5,230.0,multiline,,,multiline-faces,115.0,BEAM,38.0,end extended 0 mm along its own line to reach its support,1799B0
+B84,beam,31036.1,5723.4,30810.1,12095.0,6375.6,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799C4
+B85,beam,30780.4,12928.7,30686.0,15588.4,2661.3,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 114 mm along its own line to reach its support,1799C1
+B86,beam,32174.1,12143.3,32294.5,8744.7,3400.7,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,179A03
+B88,beam,35045.3,735.6,34863.5,5859.2,5126.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799AF
+B89,beam,34863.5,5859.2,34577.5,13928.9,8074.8,230.0,multiline,700.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799C5
+B9,beam,23030.8,15317.1,30686.0,15588.6,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,332.5,a leftover face line alongside this beam was dropped,1799B5
+B90,beam,34577.5,13928.9,34513.7,15726.2,1798.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,1799C2
+B91,beam,37062.1,5937.1,36982.7,8177.8,2242.1,230.0,multiline,500.0,drawing schedule,multiline-faces,115.0,BEAM,214.2,top -100 mm (beam schedule remark),1799C8
+B92,beam,38834.7,1947.3,38691.2,5994.9,4050.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,179994
+B93,beam,38691.1,5994.9,38496.3,11487.3,5495.8,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 1 mm along its own line to reach its support,179995
+B94,beam,38443.1,12986.3,38345.2,15748.6,2764.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,29.8,,179996
+BC1,beam,7716.4,14888.9,7637.2,17122.0,2234.5,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,end extended 0 mm along its own line to reach its support,179989
+BC10,beam,39136.7,-2698.0,40750.4,-2640.7,1614.7,230.0,multiline,750.0,drawing schedule,multiline-faces,115.0,BEAM,67.7,,18A879
+BC2,beam,15371.6,15160.5,15292.3,17393.5,2234.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,17998B
+BC3,beam,23026.7,15432.0,22947.5,17664.6,2234.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,a leftover face line alongside this beam was dropped; end extended 0 mm along its own line to reach its support,179999
+BC4,beam,30681.9,15703.9,30602.5,17943.0,2240.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,38.0,,17999A
+BC5,beam,38337.1,15978.5,38273.3,17773.3,1796.0,230.0,measured between the drawn faces,600.0,drawing schedule,face-pair,115.0,BEAM,38.0,two drawn faces merged into one beam; end extended 0 mm along its own line to reach its support,179997
+BC6,beam,31217.4,608.1,31279.3,-1137.9,1747.1,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,78.4,top -150 mm (beam schedule remark),1887E1
+BC6,beam,23562.2,336.4,23624.1,-1409.4,1746.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,92.0,top -150 mm (beam schedule remark),1887E2
+BC6,beam,15906.9,68.7,15968.9,-1680.9,1750.7,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,82.2,top -150 mm (beam schedule remark),1887E3
+BC6,beam,8251.8,-206.6,8313.7,-1952.4,1746.9,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,97.1,top -150 mm (beam schedule remark),1887E4
+BC6,beam,596.5,-474.6,658.5,-2224.0,1750.4,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,85.9,top -150 mm (beam schedule remark),1887E5
+EB1,beam,39071.7,-865.2,31279.3,-1137.9,7797.2,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,142.0,top -150 mm (beam schedule remark),1887E6
+EB1,beam,31279.3,-1137.8,23624.1,-1409.4,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,121.8,top -150 mm (beam schedule remark),1887E7
+EB1,beam,23624.1,-1409.4,15968.9,-1680.9,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,112.5,top -150 mm (beam schedule remark),1887E8
+EB1,beam,15968.9,-1680.9,8313.7,-1952.4,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,134.8,top -150 mm (beam schedule remark),1887E9
+EB1,beam,8313.7,-1952.4,658.5,-2224.0,7660.0,230.0,multiline,600.0,drawing schedule,multiline-faces,115.0,BEAM,134.0,top -150 mm (beam schedule remark),1887EA
+GB1,girder,337.7,10062.7,7763.4,10326.1,7430.4,950.0,outline,850.0,drawing schedule,outline,0.0,GIRDER BEAM,121.3,end extended 0 mm along its own line to reach its support; end extended 0 mm along its own line to reach its support,179068
+GB2,girder,15362.1,12187.1,7936.8,11919.8,7430.1,1500.0,drawing schedule (plan within 25 mm),850.0,drawing schedule,face-pair,751.6,GIRDER BEAM,104.1,two drawn faces merged into one beam,179067
+GB3,girder,15591.8,12193.3,23017.2,12456.6,7430.1,1500.0,drawing schedule (plan within 25 mm),850.0,drawing schedule,face-pair,751.6,GIRDER BEAM,135.5,two drawn faces merged into one beam; end extended 0 mm along its own line to reach its support; end extended 0 mm along its own line to reach its support,179066
+GB4,girder,8185.3,4912.9,15725.6,5180.3,7545.0,1500.0,outline,850.0,drawing schedule,outline,0.0,GIRDER BEAM,135.1,end extended 0 mm along its own line to reach its support,17906A
+GB5,girder,15725.6,5180.3,23266.0,5447.8,7545.2,1500.0,outline,850.0,drawing schedule,outline,0.0,GIRDER BEAM,123.9,end extended 0 mm along its own line to reach its support; span either side of a column,17906A
+GB6,girder,38576.3,5990.9,31150.9,5727.5,7430.1,1500.0,outline,850.0,drawing schedule,outline,0.0,GIRDER BEAM,91.3,end extended 0 mm along its own line to reach its support,179069
+GB7,girder,21466.8,5384.0,21218.2,12392.8,7013.3,1500.0,outline,850.0,drawing schedule,outline,0.0,GIRDER BEAM,135.6,,17906B

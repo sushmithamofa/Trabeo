@@ -1,0 +1,9 @@
+{
+  "_comment": "Drawings whose current extraction is locked as the baseline. dwg is relative to the New version folder. Add a case per drawing that already works; never edit expected.json by hand - recapture only when a change has been checked and agreed.",
+  "cases": [
+    {"name": "J1153_B_L1", "dwg": "samples/training/J1153_ReisMagos/01_08_2026_1153 - 1ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg", "level": "Level 1"},
+    {"name": "J1153_B_L2", "dwg": "samples/training/J1153_ReisMagos/08_09_2026_1153 - 2ND FLOOR PLAN ( B WING )dwg.dwg", "level": "Level 2"},
+    {"name": "J1153_B_L3", "dwg": "samples/training/J1153_ReisMagos/01_08_2026_1153 - 3ST FLOOR PLAN ( B WING ) 29-07-2026 (6).dwg", "level": "Level 3"},
+    {"name": "J1153_B_L4", "dwg": "samples/training/J1153_ReisMagos/08_09_2026_1153 - 4ND FLOOR PLAN ( B WING )dwg.dwg", "level": "Level 4"}
+  ]
+}

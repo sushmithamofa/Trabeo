@@ -1,0 +1,39 @@
+<section id="elements" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 05</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">How each element is drawn, so a script can trust it</h2>
+  </div>
+  <div style="display:flex; flex-direction:column">
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Columns</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One closed rectangle per column, at the scheduled size, once only</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Walls</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Lift walls and pardi walls on S-WALL, never on the column layer</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Beams</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One centreline per span, justification set to zero, parallel to the grid</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Girders</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Drawn at the scheduled width, not at a nominal 350 for all of them</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Slabs</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One closed outline per panel, edges landing on the beam centrelines</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Sunk areas</p>
+      <p style="flex:1; font-size:28px; color:#16202B">A closed outline on its depth layer, not a hatch on its own</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Openings</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Openings, stairs and landings as closed outlines on their own layers</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">16</p>
+  <aside>None of these rules asks for extra drafting. A closed rectangle is no slower to draw than an open one, and a centreline is no slower than an edge line. It is the same work, done once, in a form that reads.</aside>
+</section>

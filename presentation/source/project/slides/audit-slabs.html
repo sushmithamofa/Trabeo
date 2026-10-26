@@ -1,0 +1,21 @@
+<section id="audit-slabs" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; slabs and setting out &#183; 4 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Slabs and setting out are the thinnest part of the file</h2>
+  </div>
+  <div style="display:flex; gap:40px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:18px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px">
+      <h3 style="font-size:36px; font-weight:600">Slabs</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No outlines to build floors from.</b> The SLAB layer holds six open fragments. The 65 slab tags have no shape to belong to, so floors would have to be traced from beam edges or redrawn.</p>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>Sunk depths do not agree.</b> The layers are named 300mm SUNK and 900MM SUNK, while the legend calls for 100, 150 and 400 sunk, plus the pool and deck slabs. Nobody can tell which hatch is which depth.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:18px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px">
+      <h3 style="font-size:36px; font-weight:600">Setting out</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No grid and no dimensions.</b> Columns are numbered 1 to 32, but there is no grid to hang the model on, so the architectural grid has to stand in for it.</p>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No shared origin.</b> The plan sits about 2.3 km from the drawing origin, and no point is agreed with the architectural model, so nothing lines up on import.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">11</p>
+  <aside>The sunk depth mismatch is a safety point, not a modelling nicety: a 300 mm layer name against a 150 mm legend note means the drawing contradicts itself, and we would be guessing floor levels in the wet areas.</aside>
+</section>

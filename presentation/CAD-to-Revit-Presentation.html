@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAD to Revit Automation &#8212; J-1153</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#0B1116}
+body{font-family:'IBM Plex Sans',Arial,sans-serif}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px}
+section{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;display:none!important}
+section.live{display:flex!important}
+section>aside{display:none}
+h1,h2,h3,p{margin:0}
+ul,ol{padding-left:1.35em}
+li{margin-bottom:.35em}
+hr{border:0;height:0}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+th,td{padding:14px 18px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(22,32,43,.14);overflow-wrap:break-word}
+svg{display:block}
+x-icon{display:inline-block}
+#chrome{position:fixed;right:22px;bottom:16px;z-index:5;font-family:'JetBrains Mono',Courier New,monospace;font-size:14px;color:#8A9AA6;background:rgba(11,17,22,.72);padding:6px 12px;border-radius:6px}
+#hint{position:fixed;left:22px;bottom:16px;z-index:5;font-family:'JetBrains Mono',Courier New,monospace;font-size:13px;color:#596874}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:36vh;overflow:auto;z-index:6;display:none;background:#0F171E;color:#D7E0E7;border-top:2px solid #1F6FB2;padding:20px 28px 28px;font-size:16px;line-height:1.55}
+#notes.on{display:block}
+#notes b{display:block;margin-bottom:8px;color:#E8A15C;font-family:'JetBrains Mono',Courier New,monospace;font-weight:400;font-size:13px;letter-spacing:1px;text-transform:uppercase}
+@media print{
+@page{size:1920px 1080px;margin:0}
+html,body{overflow:visible;background:#FFFFFF}
+#stage{position:static;transform:none!important;width:auto;height:auto}
+section{position:relative;display:flex!important;page-break-after:always;break-after:page}
+#chrome,#hint,#notes{display:none!important}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+<section id="cover" data-transition="fade" style="background:#16202B; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px; display:flex; flex-direction:column; justify-content:space-between">
+  <svg aria-label="Faint blueprint grid" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute; left:0px; top:0px; opacity:0.1"><defs><pattern id="cg" width="96" height="96" patternUnits="userSpaceOnUse"><path d="M96 0H0V96" fill="none" stroke="#F7F6F2" stroke-width="1"/></pattern></defs><rect width="1920" height="1080" fill="url(#cg)"/></svg>
+  <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; letter-spacing:2px; text-transform:uppercase; color:#E8A15C">J-1153 &#183; Reis Magos Goa Housing</p>
+  <div style="display:flex; flex-direction:column; gap:32px">
+    <h1 style="font-size:96px; font-weight:600; line-height:1.05; width:1420px">From the consultant's CAD to a Revit model, automatically</h1>
+    <hr style="width:200px; border-top:6px solid #C2601F">
+    <p style="font-size:36px; color:#B7C6D2; width:1280px">What the structural CAD already gives us, what is blocking a script, and the drawing standard that closes the gap.</p>
+  </div>
+  <div style="display:flex; gap:72px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#B7C6D2">Wing C &#183; 1st floor plan</p>
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#B7C6D2">GFC dated 14-07-2026</p>
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#B7C6D2">Reviewed 24-09-2026</p>
+  </div>
+  <aside>Opening line: we are not asking the consultant to model in Revit. We are asking for a CAD drawing a script can read, so the Revit model is generated instead of redrawn. Everything in this deck comes from one real file, the Wing C first floor GFC drawing dated 14-07-2026, plus its layout and link-detail sheets.</aside>
+</section>
+
+<section id="summary" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:48px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">The answer, up front</p>
+    <h2 style="font-size:68px; font-weight:600; line-height:1.1; width:1500px">The drawings are close. Three things stand in the way.</h2>
+  </div>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:44px; border:1px solid #DCD9D0; border-radius:16px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:44px; color:#1F6FB2">01</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">The DWG is already machine-readable</h3>
+      <p style="font-size:28px; color:#4C5A66; line-height:1.4">Columns, beams and girders sit on their own layers, and 121 beam tags, 48 column labels and 65 slab tags are real text a script can read.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:44px; border:1px solid #DCD9D0; border-radius:16px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:44px; color:#1F6FB2">02</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">Three gaps block the script</h3>
+      <p style="font-size:28px; color:#4C5A66; line-height:1.4">No closed slab outlines, no grid or shared base point, and beam lines drawn on the beam edge instead of its centreline.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:44px; border:1px solid #DCD9D0; border-radius:16px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:44px; color:#1F6FB2">03</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">The fix is a drawing standard</h3>
+      <p style="font-size:28px; color:#4C5A66; line-height:1.4">Not new software. A layer list, seven drawing rules and a submission checklist, agreed once and applied to every floor.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">02</p>
+  <aside>If the meeting stops after this slide, these three points are the whole message. The consultant's drawing is not bad; it was drawn to be printed, not to be read by a program. Everything after this is evidence and detail.</aside>
+</section>
+
+<section id="today" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Why it matters</p>
+    <h2 style="font-size:68px; font-weight:600; line-height:1.1; width:1500px">Today the model is redrawn. Every revision redraws it again.</h2>
+  </div>
+  <div style="display:flex; gap:40px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:20px; background:#FDFCF9; padding:44px; border:1px solid #DCD9D0; border-radius:16px">
+      <p style="font-size:30px; font-weight:600; color:#A4500F">Manual, as we work now</p>
+      <ul style="font-size:28px; color:#4C5A66; line-height:1.45">
+        <li>Read each size off the printed schedule, mark by mark</li>
+        <li>Place 48 columns, 170 beam segments and 65 slab panels by hand, per floor</li>
+        <li>Re-type reinforcement into Revit, or leave it out of the model</li>
+        <li>A GFC revision repeats most of that work</li>
+      </ul>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:20px; background:#16202B; color:#F7F6F2; padding:44px; border-radius:16px">
+      <p style="font-size:30px; font-weight:600; color:#E8A15C">Automated, once the CAD is right</p>
+      <ul style="font-size:28px; color:#B7C6D2; line-height:1.45">
+        <li>The script reads the DWG layers and the Excel schedules</li>
+        <li>Geometry, marks, sizes, grade and steel land in one pass</li>
+        <li>A revision becomes a re-run and a difference report</li>
+        <li>An audit list names every mark it could not place</li>
+      </ul>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">Effort today [__ hrs per floor] &#183; target [__ hrs] &#8212; to be filled from our Wing C record</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">03</p>
+  <aside>The point to land: the cost is not the first model, it is every reissue after it. Fill the two bracketed figures from our own Wing C timesheet before presenting.</aside>
+</section>
+
+<section id="prize" style="background:#16202B; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:48px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#E8A15C">The scale of one floor</p>
+    <h2 style="font-size:68px; font-weight:600; line-height:1.1; width:1500px">Wing C, first floor, counted from the DWG</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:32px">
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:112px; font-weight:600; line-height:1; color:#E8A15C">48</p>
+      <hr style="border-top:2px solid #3A4754">
+      <p style="font-size:30px; color:#B7C6D2; line-height:1.35">column labels on the plan, 38 matching the schedule size exactly</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:112px; font-weight:600; line-height:1; color:#E8A15C">170</p>
+      <hr style="border-top:2px solid #3A4754">
+      <p style="font-size:30px; color:#B7C6D2; line-height:1.35">beam segments drawn, as multilines, plain lines and polylines</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:112px; font-weight:600; line-height:1; color:#E8A15C">65</p>
+      <hr style="border-top:2px solid #3A4754">
+      <p style="font-size:30px; color:#B7C6D2; line-height:1.35">slab tags, against zero closed outlines to build floors from</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:112px; font-weight:600; line-height:1; color:#E8A15C">21</p>
+      <hr style="border-top:2px solid #3A4754">
+      <p style="font-size:30px; color:#B7C6D2; line-height:1.35">issues in the audit, every one of them fixable in the drawing</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">One floor of one wing. J-1153 runs to [__] floors across [__] wings.</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">04</p>
+  <aside>These four numbers are read out of the 14-07-2026 DWG, not estimated. The last one is the bridge into the audit section: 21 issues, all of them drawing issues rather than software limits.</aside>
+</section>
+
+<section id="pipeline" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:32px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">How it works</p>
+    <h2 style="font-size:68px; font-weight:600; line-height:1.1; width:1500px">Five steps from DWG to a checked Revit model</h2>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">1</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Read the layers</h3>
+        <p style="font-size:26px; color:#4C5A66">Column, wall, beam, girder, slab and sunk layers come out as shapes with coordinates.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">2</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Match every tag to its shape</h3>
+        <p style="font-size:26px; color:#4C5A66">Each mark text is joined to the nearest element, so C-3 and B-34 attach to real geometry.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">3</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Join the schedules</h3>
+        <p style="font-size:26px; color:#4C5A66">Excel rows supply size, thickness, concrete grade and reinforcement for each mark.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">4</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Place in Revit</h3>
+        <p style="font-size:26px; color:#4C5A66">Levels and grids first, then columns, beams, floors with their sunk offsets, then the 230 walls.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:32px; background:#FDFCF9; padding:22px 36px; border:1px solid #DCD9D0; border-radius:12px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:48px; font-weight:600; color:#1F6FB2; width:70px">5</p>
+      <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+        <h3 style="font-size:32px; font-weight:600">Audit against the sheet</h3>
+        <p style="font-size:26px; color:#4C5A66">Marks without geometry, geometry without marks, clashes, and Revit schedules compared to the GFC tables.</p>
+      </div>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">05</p>
+  <aside>Step 5 is the one to stress with management: the script does not ask to be trusted. Every run produces a list of what it could not place, so drawing and model are reconciled rather than assumed.</aside>
+</section>
+
+<section id="strengths" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Audit of the Wing C DWG, 14-07-2026</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; width:1500px">Six things the drawing already does right</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:32px">
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">Layers are already split</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">COLUMN, FL COL, BEAM, GIRDER BEAM, SLAB NO and the sunk hatches each have their own layer.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">Columns are closed shapes</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">Most are closed rectangles, which give a centre point, a size and a rotation directly.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">Beams sit at one width</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">113 beams are 230 wide multilines, so their lines can be pulled out as they are.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">Tags are real text</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">121 beam tags, 48 column labels and 65 slab tags, all readable rather than exploded.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">Sizes agree with the schedule</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">38 of the 48 column labels match the scheduled size exactly, with no interpretation.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; background:#FDFCF9; padding:32px; border:1px solid #DCD9D0; border-radius:14px">
+      <x-icon name="Check" style="color:#1F6FB2; width:32px; height:32px"></x-icon>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.2">The schedules are complete</h3>
+      <p style="font-size:26px; color:#4C5A66; line-height:1.45">Beams, GB-1 to GB-6, C-1 to C-32, FC-1 to FC-6 and S-1 to S-10, with concrete grade.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">06</p>
+  <aside>Open the audit on the positives. The consultant has to hear that we are asking for small changes to a drawing that is already close, not for a different way of working.</aside>
+</section>
+
+<section id="blockers" style="background:#16202B; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#E8A15C">The three that stop a script dead</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; width:1500px">Everything else is tidying. These three are structural.</h2>
+  </div>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; padding:36px; border:1px solid #3A4754; border-radius:16px; border-top:6px solid #C2601F">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#E8A15C">Blocker 01</p>
+      <h3 style="font-size:36px; font-weight:600; line-height:1.15">Slabs have no outlines</h3>
+      <p style="font-size:27px; color:#B7C6D2; line-height:1.45">The SLAB layer holds six open fragments. There are 65 slab tags and not one closed shape to turn into a Revit floor.</p>
+      <p style="font-size:27px; color:#F7F6F2; line-height:1.45">Needed: one closed outline per slab panel.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; padding:36px; border:1px solid #3A4754; border-radius:16px; border-top:6px solid #C2601F">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#E8A15C">Blocker 02</p>
+      <h3 style="font-size:36px; font-weight:600; line-height:1.15">Nothing to set out from</h3>
+      <p style="font-size:27px; color:#B7C6D2; line-height:1.45">No grids and no dimensions in the plan area. The drawing sits about 2.3 km from its origin, with no point shared with the architectural model.</p>
+      <p style="font-size:27px; color:#F7F6F2; line-height:1.45">Needed: a grid layer and one agreed base point.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; padding:36px; border:1px solid #3A4754; border-radius:16px; border-top:6px solid #C2601F">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#E8A15C">Blocker 03</p>
+      <h3 style="font-size:36px; font-weight:600; line-height:1.15">Beam lines are faces</h3>
+      <p style="font-size:27px; color:#B7C6D2; line-height:1.45">The multilines are top justified, so every drawn line is a beam face, 115 mm off centre, and nothing says which side.</p>
+      <p style="font-size:27px; color:#F7F6F2; line-height:1.45">Needed: one centreline per span.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">07</p>
+  <aside>These three cannot be worked around in code. Everything on the next three slides can be, at a cost; these have to change in the drawing. If the consultant only agrees to three changes, make them these.</aside>
+</section>
+
+<section id="audit-columns" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; columns and walls &#183; 7 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Columns: duplicates, open shapes and stray heights</h2>
+  </div>
+  <table style="font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; border-bottom:1px solid #DCD9D0; padding:14px 18px">
+    <tr style="background:#16202B">
+      <th style="width:18%; color:#F7F6F2; text-align:left; font-size:24px">Issue</th>
+      <th style="width:52%; color:#F7F6F2; text-align:left; font-size:24px">What the DWG contains</th>
+      <th style="width:30%; color:#F7F6F2; text-align:left; font-size:24px">What closes it</th>
+    </tr>
+    <tr>
+      <td>Duplicates</td>
+      <td>10 column outlines drawn twice, one over the other</td>
+      <td>Delete duplicates before issue</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Open outlines</td>
+      <td>C-24, C-25, C-30 and two unlabelled shapes are open 5-point polylines</td>
+      <td>Close every column outline</td>
+    </tr>
+    <tr>
+      <td>C-30 size</td>
+      <td>Drawn 230x827; the schedule says 230x950; an unlabelled 230x950 sits 0.9 m away</td>
+      <td>Confirm the size and retag</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Not in schedule</td>
+      <td>C-11, 15, 16, 19 and 20 are drawn at 350x750</td>
+      <td>Confirm as column stops</td>
+    </tr>
+    <tr>
+      <td>Unlabelled shapes</td>
+      <td>350x1480, 350x2000, 230x230, plus lift-wall pieces 230x2110 and 230x1950</td>
+      <td>Tag, or move to the wall layer</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Stray Z heights</td>
+      <td>C-3A, 4A, 7A and 10A sit at Z = -11,425; tags range from 229 to 14,784</td>
+      <td>Flatten the drawing to Z = 0</td>
+    </tr>
+    <tr>
+      <td>Tags too far</td>
+      <td>Column numbers sit 200 to 1,400 mm away from the column they label</td>
+      <td>Place within 300 mm</td>
+    </tr>
+  </table>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">08</p>
+  <aside>Two rows matter most in the room: the duplicates, which would silently create double columns in Revit, and the tag distance, which is what makes label-to-column matching unreliable. The rest is clean-up anyone can run in ten minutes.</aside>
+</section>
+
+<section id="audit-beams" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; beams and girders &#183; 6 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Beams: the geometry is there, the centrelines are not</h2>
+  </div>
+  <table style="font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; border-bottom:1px solid #DCD9D0; padding:14px 18px">
+    <tr style="background:#16202B">
+      <th style="width:22%; color:#F7F6F2; text-align:left; font-size:24px">Issue</th>
+      <th style="width:48%; color:#F7F6F2; text-align:left; font-size:24px">What the DWG contains</th>
+      <th style="width:30%; color:#F7F6F2; text-align:left; font-size:24px">What closes it</th>
+    </tr>
+    <tr>
+      <td>Lines are faces</td>
+      <td>Top-justified multilines, so each line is a face, 115 mm off centre</td>
+      <td>Draw one centreline per span</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Mixed entity types</td>
+      <td>113 multilines, 49 plain lines and 8 polylines</td>
+      <td>One entity type for all beams</td>
+    </tr>
+    <tr>
+      <td>Girder widths absent</td>
+      <td>Only 2 girders are drawn, both 350 wide, against 9 GB tags from 350 to 1500</td>
+      <td>Draw girders at schedule width</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Tags away from lines</td>
+      <td>B54 is 2.2 m from any beam, B87 is 2.7 m; BP1, BP2 and BP3 match nothing</td>
+      <td>Place within 300 mm</td>
+    </tr>
+    <tr>
+      <td>Scheduled, not tagged</td>
+      <td>B-60 appears only inside S4A/B60; B-94 and B-97 are absent; GB3A is tagged twice</td>
+      <td>One tag per span, once</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Off-angle lines</td>
+      <td>The plan sits at 2 degrees, one wing at 69; stray lines run at 0, 6 and 85</td>
+      <td>Align every line to the grid</td>
+    </tr>
+    <tr>
+      <td>Schedule gaps</td>
+      <td>B-103 and B-106 carry no depth; GB-5 reads 1480 800/; B-34 reads 700/ and varies</td>
+      <td>Complete the schedule rows</td>
+    </tr>
+  </table>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">09</p>
+  <aside>The first row is the one to dwell on, and the next slide draws it. The last row is worth reading out verbatim: those three schedule entries cannot be modelled at all until someone completes them.</aside>
+</section>
+
+<section id="centreline" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:36px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Blocker 03, drawn out</p>
+    <h2 style="font-size:56px; font-weight:600; line-height:1.1; width:1500px">Every beam in the model would sit 115 mm out</h2>
+  </div>
+  <div style="width:1500px; display:flex; flex-direction:column; gap:20px">
+    <div style="display:flex; gap:100px">
+      <p style="width:700px; font-size:30px; font-weight:600; color:#A4500F">As the DWG is drawn now</p>
+      <p style="width:700px; font-size:30px; font-weight:600; color:#1F6FB2">As the script needs it</p>
+    </div>
+    <svg aria-label="Two beam spans between columns. On the left the heavy drawn line runs along the top face of the beam, with the true centreline shown as a dashed line 115 mm below it and a bracket marking the gap. On the right the heavy drawn line runs along the centre of the beam." width="1500" height="280" viewBox="0 0 1500 280">
+      <rect x="10" y="20" width="90" height="200" fill="#D8D5CC" stroke="#BFBCB2" stroke-width="2"/>
+      <rect x="600" y="20" width="90" height="200" fill="#D8D5CC" stroke="#BFBCB2" stroke-width="2"/>
+      <rect x="100" y="80" width="500" height="80" fill="#E7E9E4" stroke="#C3C7BF" stroke-width="2"/>
+      <path d="M520 80V120" stroke="#16202B" stroke-width="2"/>
+      <path d="M512 80h16M512 120h16" stroke="#16202B" stroke-width="2"/>
+      <path d="M100 120H600" stroke="#1F6FB2" stroke-width="3" stroke-dasharray="14 10"/>
+      <path d="M100 80H600" stroke="#C2601F" stroke-width="9"/>
+      <rect x="810" y="20" width="90" height="200" fill="#D8D5CC" stroke="#BFBCB2" stroke-width="2"/>
+      <rect x="1400" y="20" width="90" height="200" fill="#D8D5CC" stroke="#BFBCB2" stroke-width="2"/>
+      <rect x="900" y="80" width="500" height="80" fill="#E7E9E4" stroke="#C3C7BF" stroke-width="2"/>
+      <path d="M900 120H1400" stroke="#1F6FB2" stroke-width="9"/>
+    </svg>
+    <div style="display:flex; gap:100px">
+      <div style="width:700px; display:flex; flex-direction:column; gap:8px">
+        <p style="font-size:24px; color:#A4500F; line-height:1.45">Thick ochre line: the line actually in the file, lying on the beam face. The bracket is the 115 mm error.</p>
+        <p style="font-size:24px; color:#1F6FB2; line-height:1.45">Blue dashes: where the centreline really is.</p>
+      </div>
+      <p style="width:700px; font-size:24px; color:#1F6FB2; line-height:1.45">Thick blue line: one centreline per span, with multiline justification set to zero. Nothing left to guess.</p>
+    </div>
+  </div>
+  <p style="font-size:28px; color:#4C5A66; width:1500px; line-height:1.4">A script can add 115 mm, but it cannot work out which side to add it to. On a plan rotated 2 degrees with one wing at 69, guessing the side puts beams a full width away from their columns.</p>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">10</p>
+  <aside>This is the slide that usually settles the argument. It also sets up the open question later in the deck: if beams are drawn centre to centre, the ends need trimming to the column face; if face to face, the script has to extend them. One convention, agreed once.</aside>
+</section>
+
+<section id="audit-slabs" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Findings &#183; slabs and setting out &#183; 4 issues</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Slabs and setting out are the thinnest part of the file</h2>
+  </div>
+  <div style="display:flex; gap:40px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:18px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px">
+      <h3 style="font-size:36px; font-weight:600">Slabs</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No outlines to build floors from.</b> The SLAB layer holds six open fragments. The 65 slab tags have no shape to belong to, so floors would have to be traced from beam edges or redrawn.</p>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>Sunk depths do not agree.</b> The layers are named 300mm SUNK and 900MM SUNK, while the legend calls for 100, 150 and 400 sunk, plus the pool and deck slabs. Nobody can tell which hatch is which depth.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:18px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px">
+      <h3 style="font-size:36px; font-weight:600">Setting out</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No grid and no dimensions.</b> Columns are numbered 1 to 32, but there is no grid to hang the model on, so the architectural grid has to stand in for it.</p>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45"><b>No shared origin.</b> The plan sits about 2.3 km from the drawing origin, and no point is agreed with the architectural model, so nothing lines up on import.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">11</p>
+  <aside>The sunk depth mismatch is a safety point, not a modelling nicety: a 300 mm layer name against a 150 mm legend note means the drawing contradicts itself, and we would be guessing floor levels in the wet areas.</aside>
+</section>
+
+<section id="scorecard" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">The audit in one picture</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">21 issues, and not one of them needs new software</h2>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:40px">
+    <div style="display:flex; align-items:center; gap:24px">
+      <p style="width:360px; font-size:30px; color:#16202B">Columns and walls</p>
+      <div style="width:770px; height:56px; background:#1F6FB2; border-radius:0px 4px 4px 0px"></div>
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:30px; color:#16202B">7 issues</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:24px">
+      <p style="width:360px; font-size:30px; color:#16202B">Beams and girders</p>
+      <div style="width:770px; height:56px; background:#1F6FB2; border-radius:0px 4px 4px 0px"></div>
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:30px; color:#16202B">7 issues</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:24px">
+      <p style="width:360px; font-size:30px; color:#16202B">Slabs and setting out</p>
+      <div style="width:440px; height:56px; background:#1F6FB2; border-radius:0px 4px 4px 0px"></div>
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:30px; color:#16202B">4 issues</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:24px">
+      <p style="width:360px; font-size:30px; color:#16202B">Schedules and notes</p>
+      <div style="width:330px; height:56px; background:#1F6FB2; border-radius:0px 4px 4px 0px"></div>
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:30px; color:#16202B">3 issues</p>
+    </div>
+  </div>
+  <p style="font-size:30px; color:#4C5A66; width:1500px; line-height:1.4">Every issue is traced to the rule it breaks in the standard, so the consultant receives a list of fixes rather than a list of complaints. Schedules and notes covers grouped mark rows, the M30 and M40 grade split, and the missing level table.</p>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">12</p>
+  <aside>The chart is here to make the scale feel manageable. Twenty-one sounds like a lot until it is split four ways and each one has a one-line fix. This is the pivot from problem to standard.</aside>
+</section>
+
+<section id="standard-map" style="background:#16202B; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#E8A15C">The standard</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; width:1500px">Structural CAD Standard for Automated Revit Modelling</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:28px">
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">01</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Purpose</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">What the script reads, and what comes back as a query.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">02</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Deliverables</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">Per floor: DWG, schedules, levels, sections, revisions.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">03</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Drawing setup</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">Units, origin, heights, file naming, model space.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">04</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Layer standard</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">Fourteen element layers, each with its own tag layer.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">05</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Drawing rules</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">How each element is drawn, element by element.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">06</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Tags and schedules</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">Mark formats, tag placement, one row per mark.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">07</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Wing C findings</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">All 21 issues, each linked to the rule it breaks.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:28px; border:1px solid #3A4754; border-radius:14px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:34px; color:#E8A15C">08</p>
+      <h3 style="font-size:28px; font-weight:600; line-height:1.2">Checklist</h3>
+      <p style="font-size:24px; color:#B7C6D2; line-height:1.4">Twelve items to tick before every issue.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">Issued as one document, agreed once, applied to every floor</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">13</p>
+  <aside>The document exists already. The next four slides pull out the parts the consultant will argue about, so nobody has to read all eight sections in the meeting.</aside>
+</section>
+
+<section id="setup" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 03</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Drawing setup: seven things fixed before anything is drawn</h2>
+  </div>
+  <div style="display:flex; flex-direction:column">
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Units</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Millimetres, drawn 1:1, nothing scaled or exploded</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Origin</p>
+      <p style="flex:1; font-size:28px; color:#16202B">The architect's base point, identical XY on every floor, never re-rotated</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Heights</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Everything flat at Z = 0, with FLATTEN run before the file is issued</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Files</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One floor per DWG, named J1153_Wing_Level_STR_YYYY-MM-DD.dwg</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Model space</p>
+      <p style="flex:1; font-size:28px; color:#16202B">The plan only, with no xrefs, no images and no viewports in it</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Housekeeping</p>
+      <p style="flex:1; font-size:28px; color:#16202B">OVERKILL run, no duplicated entities, no structural elements inside blocks</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Grids</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Structural grid on S-GRID, matching the architectural grid line for line</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">14</p>
+  <aside>Origin and heights are the two that cost nothing and save the most. The Wing C file breaks both: it sits 2.3 km from its origin and has elements at Z = -11,425.</aside>
+</section>
+
+<section id="layers" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 04</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">One layer per element type, and a tag layer for each</h2>
+  </div>
+  <div style="display:flex; gap:40px">
+    <table style="flex:1; font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; padding:12px 16px">
+      <tr style="background:#16202B">
+        <th style="width:44%; color:#F7F6F2; text-align:left; font-size:24px">Layer</th>
+        <th style="width:56%; color:#F7F6F2; text-align:left; font-size:24px">What goes on it</th>
+      </tr>
+      <tr><td>S-COL</td><td>Columns continuing up</td></tr>
+      <tr style="background:#FDFCF9"><td>S-COL-STOP</td><td>Columns stopping here</td></tr>
+      <tr><td>S-COL-FLOAT</td><td>Floating columns</td></tr>
+      <tr style="background:#FDFCF9"><td>S-WALL</td><td>Lift and pardi walls, 230</td></tr>
+      <tr><td>S-BEAM</td><td>Beam centrelines</td></tr>
+      <tr style="background:#FDFCF9"><td>S-GIRDER</td><td>Girder centrelines</td></tr>
+      <tr><td>S-SLAB</td><td>One outline per panel</td></tr>
+    </table>
+    <table style="flex:1; font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; padding:12px 16px">
+      <tr style="background:#16202B">
+        <th style="width:44%; color:#F7F6F2; text-align:left; font-size:24px">Layer</th>
+        <th style="width:56%; color:#F7F6F2; text-align:left; font-size:24px">What goes on it</th>
+      </tr>
+      <tr><td>S-SUNK-100/150/400</td><td>Sunk zones, by depth</td></tr>
+      <tr style="background:#FDFCF9"><td>S-OPEN</td><td>Openings and cut-outs</td></tr>
+      <tr><td>S-STAIR</td><td>Stairs and landings</td></tr>
+      <tr style="background:#FDFCF9"><td>S-GRID</td><td>Grid lines and bubbles</td></tr>
+      <tr><td>S-REF</td><td>Base point, level marks</td></tr>
+      <tr style="background:#FDFCF9"><td>S-ANNO</td><td>Notes, legend, title block</td></tr>
+      <tr><td>...-TAG</td><td>One per element layer</td></tr>
+    </table>
+  </div>
+  <p style="font-size:28px; color:#4C5A66; width:1500px; line-height:1.4">The current file already separates COLUMN, BEAM and GIRDER BEAM. What it lacks is a wall layer, a usable slab layer, a grid layer, and sunk layers whose names match their depth.</p>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">15</p>
+  <aside>Say plainly that these names are a proposal, not a house rule to defend. If the consultant already runs a layer standard, we map ours onto theirs once and the script follows their names.</aside>
+</section>
+
+<section id="elements" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 05</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">How each element is drawn, so a script can trust it</h2>
+  </div>
+  <div style="display:flex; flex-direction:column">
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Columns</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One closed rectangle per column, at the scheduled size, once only</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Walls</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Lift walls and pardi walls on S-WALL, never on the column layer</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Beams</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One centreline per span, justification set to zero, parallel to the grid</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Girders</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Drawn at the scheduled width, not at a nominal 350 for all of them</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Slabs</p>
+      <p style="flex:1; font-size:28px; color:#16202B">One closed outline per panel, edges landing on the beam centrelines</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Sunk areas</p>
+      <p style="flex:1; font-size:28px; color:#16202B">A closed outline on its depth layer, not a hatch on its own</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #DCD9D0">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:300px">Openings</p>
+      <p style="flex:1; font-size:28px; color:#16202B">Openings, stairs and landings as closed outlines on their own layers</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">16</p>
+  <aside>None of these rules asks for extra drafting. A closed rectangle is no slower to draw than an open one, and a centreline is no slower than an edge line. It is the same work, done once, in a form that reads.</aside>
+</section>
+
+<section id="tags" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 06</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Marks on the plan, and the same marks in Excel</h2>
+  </div>
+  <div style="display:flex; gap:48px">
+    <div style="width:880px; display:flex; flex-direction:column; gap:24px">
+      <h3 style="font-size:32px; font-weight:600">The mark formats</h3>
+      <div style="display:flex; flex-wrap:wrap; gap:14px">
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">C-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">FC-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">LW-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">B-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">BC-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">BP-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">MLB-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">GB-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">S-</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; background:#E9EDF2; padding:10px 18px; border-radius:8px">ST-</p>
+      </div>
+      <ul style="font-size:28px; color:#4C5A66; line-height:1.45">
+        <li>One mark per text object, never two marks in one string</li>
+        <li>Placed inside the element, or within 300 mm of it</li>
+        <li>No leaders, no exploded text, no marks buried in blocks</li>
+      </ul>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:20px">
+      <h3 style="font-size:32px; font-weight:600">One row per mark</h3>
+      <div style="display:flex; flex-direction:column; gap:8px; background:#FDFCF9; padding:28px; border:1px solid #DCD9D0; border-radius:12px">
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#A4500F">As issued today</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#16202B">B-2,4,7 | 230x600 | M30</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; background:#16202B; padding:28px; border-radius:12px">
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#E8A15C">As delivered</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#F7F6F2">B-2 | 230x600 | M30</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#F7F6F2">B-4 | 230x600 | M30</p>
+        <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#F7F6F2">B-7 | 230x600 | M30</p>
+      </div>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">17</p>
+  <aside>The ungrouping is the one ask the consultant may resist, because the grouped row is faster to draft. Offer to do the split ourselves from their Excel if they send the grouped version, as long as the grouping is consistent.</aside>
+</section>
+
+<section id="revit-template" style="background:#16202B; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#E8A15C">Our side of the work</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">A Revit template set up once, then reused on every floor</h2>
+  </div>
+  <div style="display:flex; flex-direction:column">
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Column family</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">One rectangular concrete column, types named C-3 230x1200</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Beam family</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">One concrete beam, types B 230x600 through to GB 900x800</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Floor types</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">125, 150, 175 and 200, with sunk zones as level offsets</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Wall type</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">230 structural wall for lift walls LW-1 to LW-4 and the pardi walls</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Materials</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">M30 for beams and slabs, M40 for girders, as two separate materials</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:32px; padding:18px 0px; border-bottom:1px solid #3A4754">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#E8A15C; width:340px">Shared parameters</p>
+      <p style="flex:1; font-size:28px; color:#F7F6F2">Mark, Top Steel, Bottom Steel, Stirrups, Extra Top, Remark, Concrete Grade</p>
+    </div>
+  </div>
+  <p style="font-size:28px; color:#B7C6D2; width:1500px; line-height:1.4">With the parameters carrying the steel, the beam and column schedules come out of the model instead of being drawn by hand, and they can be checked line by line against the GFC sheet.</p>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#B7C6D2">18</p>
+  <aside>This slide exists so the consultant sees we are not pushing all the work onto them. The template, the script and the audit are ours; the drawing discipline is theirs.</aside>
+</section>
+
+<section id="ask" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">The ask</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Eight things with every floor, every issue</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:28px">
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">01</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">The DWG, one floor per file, cleaned, flattened and set out from the agreed base point</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">02</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">Column schedule as Excel, one row per mark, numbers only</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">03</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">Beam and girder schedule as Excel, with every depth filled in</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">04</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">Slab schedule as Excel, with thickness and sunk depth per panel</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">05</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">A level table from plinth to terrace, with beam top levels</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">06</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">Sections through the sunk areas, pool, stairs and lift</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">07</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">The grid, or written confirmation that we use the architectural grid</p>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:24px">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:28px; color:#1F6FB2; width:44px">08</p>
+      <p style="flex:1; font-size:28px; color:#16202B; line-height:1.4">A revision list naming what changed since the previous issue</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">The standard carries a 12-item checklist to tick before each issue</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">19</p>
+  <aside>Item 8 is the quiet win. A revision list turns each reissue into a targeted re-run instead of a full rebuild, which is where most of the saving actually comes from.</aside>
+</section>
+
+<section id="questions" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:40px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Open decisions</p>
+    <h2 style="font-size:56px; font-weight:600; line-height:1.1; width:1500px">Seven answers we need before the first automated run</h2>
+  </div>
+  <table style="font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; border-bottom:1px solid #DCD9D0; padding:14px 18px">
+    <tr style="background:#16202B">
+      <th style="width:44%; color:#F7F6F2; text-align:left; font-size:24px">Question</th>
+      <th style="width:34%; color:#F7F6F2; text-align:left; font-size:24px">What it unblocks</th>
+      <th style="width:22%; color:#F7F6F2; text-align:left; font-size:24px">Answered by</th>
+    </tr>
+    <tr>
+      <td>Beam lines: column face to face, or centre to centre?</td>
+      <td>Beam extraction and end trimming</td>
+      <td>Consultant</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Which hatch is 100, 150 and 400 sunk? Layers say 300 and 900</td>
+      <td>Slab offsets in the wet areas</td>
+      <td>Consultant</td>
+    </tr>
+    <tr>
+      <td>Are C-11, 15, 16, 19 and 20 column stops?</td>
+      <td>Whether to model them at all</td>
+      <td>Consultant</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>C-30: is it 230x827 as drawn, or 230x950 as scheduled?</td>
+      <td>Column size and its tag</td>
+      <td>Consultant</td>
+    </tr>
+    <tr>
+      <td>B-60, B-94 and B-97 are scheduled but not tagged</td>
+      <td>Three beams we cannot place</td>
+      <td>Consultant</td>
+    </tr>
+    <tr style="background:#FDFCF9">
+      <td>Floor-to-floor heights, plinth to terrace</td>
+      <td>Levels for every floor</td>
+      <td>Consultant</td>
+    </tr>
+    <tr>
+      <td>Which point is shared with the architectural model?</td>
+      <td>Setting out and alignment</td>
+      <td>Us and consultant</td>
+    </tr>
+  </table>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">20</p>
+  <aside>Take these one at a time in the meeting and write the answer on the slide. The first question is the only one with a real trade-off; the other six are facts someone in the room already knows.</aside>
+</section>
+
+<section id="roadmap" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:space-between; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Next steps</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">Prove it on one floor, then make it the way we work</h2>
+  </div>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px; border-top:6px solid #1F6FB2">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#A4500F">Phase 1 &#183; [__ weeks]</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">Agree the standard</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45">Issue the standard to the consultant, settle the seven open questions, and fix the shared base point with the architects.</p>
+      <p style="font-size:26px; color:#16202B">Owner: MOFA Studio</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px; border-top:6px solid #1F6FB2">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#A4500F">Phase 2 &#183; [__ weeks]</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">Pilot on Wing C, 1st floor</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45">The consultant reissues this floor to the standard. We run the script, model it end to end and compare the result against the GFC sheet.</p>
+      <p style="font-size:26px; color:#16202B">Owner: consultant, then us</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:16px; background:#FDFCF9; padding:40px; border:1px solid #DCD9D0; border-radius:16px; border-top:6px solid #1F6FB2">
+      <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:26px; color:#A4500F">Phase 3 &#183; [__ weeks]</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.2">Roll out and write it in</h3>
+      <p style="font-size:27px; color:#4C5A66; line-height:1.45">Apply it to every floor and wing on J-1153, and attach the standard to the consultant's appointment for future jobs.</p>
+      <p style="font-size:26px; color:#16202B">Owner: MOFA Studio</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">Durations and dates to be agreed in the meeting</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">21</p>
+  <aside>Ask for a decision on Phase 2 only. One floor, reissued to the standard, is a small enough commitment for the consultant to say yes to in the room, and it is the only way to find out what the standard missed.</aside>
+</section>
+
+<section id="close" data-transition="fade" style="background:#1F6FB2; color:#F7F6F2; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px; display:flex; flex-direction:column; justify-content:center; gap:40px">
+  <h1 style="font-size:104px; font-weight:600; line-height:1.05; width:1500px">Fix the drawing once. Every floor after it models itself.</h1>
+  <hr style="width:200px; border-top:6px solid #F7F6F2">
+  <p style="font-size:34px; width:1300px; line-height:1.4">Structural CAD Standard for Automated Revit Modelling, J-1153. Twenty-one findings, seven questions, one pilot floor.</p>
+  <aside>Close on the pilot, not on the standard. The ask in the room is a single reissued floor.</aside>
+</section>
+
+</div>
+<div id="hint">&#8592; &#8594; slides &#183; N notes &#183; P print or PDF</div>
+<div id="chrome"><span id="cur">1</span> / <span id="tot">22</span></div>
+<div id="notes"></div>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var slides = [].slice.call(stage.querySelectorAll('section'));
+  var notes = document.getElementById('notes');
+  var i = 0;
+
+  document.getElementById('tot').textContent = slides.length;
+
+  var CHECK = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  [].forEach.call(document.querySelectorAll('x-icon'), function (el) {
+    el.innerHTML = CHECK;
+  });
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, k) {
+      if (k === i) { s.classList.add('live'); } else { s.classList.remove('live'); }
+    });
+    document.getElementById('cur').textContent = i + 1;
+    var a = slides[i].querySelector('aside');
+    notes.innerHTML = '<b>Speaker notes &#183; slide ' + (i + 1) + ' of ' + slides.length + '</b>' +
+      (a ? a.textContent : 'No notes on this slide.');
+    if (history.replaceState) { history.replaceState(null, '', '#' + slides[i].id); }
+  }
+
+  window.addEventListener('resize', fit);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { show(i + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { show(i - 1); e.preventDefault(); }
+    else if (e.key === 'Home') { show(0); }
+    else if (e.key === 'End') { show(slides.length - 1); }
+    else if (e.key === 'n' || e.key === 'N') { notes.classList.toggle('on'); }
+    else if (e.key === 'p' || e.key === 'P') { window.print(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('#notes')) { return; }
+    show(i + 1);
+  });
+
+  fit();
+
+  var start = 0;
+  for (var k = 0; k < slides.length; k++) {
+    if ('#' + slides[k].id === window.location.hash) { start = k; }
+  }
+  show(start);
+})();
+</script>
+</body>
+</html>

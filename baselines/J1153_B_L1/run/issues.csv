@@ -1,0 +1,118 @@
+﻿severity,category,mark,layer,message,x,y,handle
+info,blocks,,,Block 'G$C8AF725FA' is inserted at plan scale and was opened out; 51 structural entities inside it were extracted. Without this they would have been missed entirely.,,,
+info,blocks,,,Block '5444' is inserted at plan scale and was opened out; 23 structural entities inside it were extracted. Without this they would have been missed entirely.,,,
+info,blocks,,,Block 'GRID' is inserted at plan scale and was opened out; 9 structural entities inside it were extracted. Without this they would have been missed entirely.,,,
+warning,blocks,,,"Block 'zw$CD88' holds 16 entities on structural layers but is inserted at 6x scale, so it was treated as a detail or section and left out. If it is part of the plan, add its name to ""blocks"": {""explode_names"": [...]} in config.json.",,,
+info,legend,,,"Sunk depths read from the legend: 400 mm = FLEX (scale 20) on 900MM SUNK, 100 mm = ANSI33 (scale 1000) on 300MM SUNK, 150 mm = HONEY (scale 50) on HATCH, 400 mm = CROSS (scale 30) on HATCH, 100 mm = ANGLE (scale 20) on HATCH LIGHT_MOFA, 150 mm = ANSI36 (scale 30) on HATCH LIGHT_MOFA, 200 mm = ANSI37 (scale 30) on HATCH LIGHT_MOFA, 250 mm = AR-PARQ1 (scale 1) on HATCH_LIGHT_MOFA, 300 mm = AR-HBONE (scale 1) on HATCH LIGHT_MOFA, 350 mm = BRASS (scale 30) on HATCH LIGHT_MOFA, 400 mm = CORK (scale 30) on HATCH LIGHT_MOFA, 450 mm = CROSS (scale 30) on HATCH LIGHT_MOFA, 500 mm = DOLMIT (scale 20) on HATCH LIGHT_MOFA, 550 mm = FLEX (scale 20) on HATCH LIGHT_MOFA, 600 mm = GOST_GLASS (scale 20) on HATCH LIGHT_MOFA, 750 mm = GOST_WOOD (scale 30) on HATCH LIGHT_MOFA, 900 mm = HONEY (scale 20) on HATCH LIGHT_MOFA.",,,
+info,legend,,,"31 entities inside 'LEGEND' were left out, because a legend is drawn on the same layers as the structure it describes and would otherwise become real elements. Layers: TXT (9), COLUMN (9), COL HATCH (3), BEAM (2), GIRDER BEAM (2), HATCH (2). If any of it was real structure, set ""legend"": {""detect"": false} in config.json.",,,
+info,legend,,,"5 entities inside 'KEY PLAN' were left out, because a legend is drawn on the same layers as the structure it describes and would otherwise become real elements. Layers: SHEET (4), 0 (1). If any of it was real structure, set ""legend"": {""detect"": false} in config.json.",,,
+info,legend,,,"58 entities inside 'legend (no heading)' were left out, because a legend is drawn on the same layers as the structure it describes and would otherwise become real elements. Layers: TXT (19), HATCH BOX (19), HATCH LIGHT_MOFA (16), BEAM (2), HATCH_LIGHT_MOFA (1), GIRDER BEAM (1). If any of it was real structure, set ""legend"": {""detect"": false} in config.json.",,,
+info,layers,,COMMENTS,"Layer 'COMMENTS' carries 1 entities but is not in the layer map, so it was skipped. Add it to config.json if it holds structure.",,,
+info,layers,,ELEV_09_MOFA,"Layer 'ELEV_09_MOFA' carries 2 entities but is not in the layer map, so it was skipped. Add it to config.json if it holds structure.",,,
+info,layers,,REVISION CLOUD,"Layer 'REVISION CLOUD' carries 1 entities but is not in the layer map, so it was skipped. Add it to config.json if it holds structure.",,,
+info,layers,,TEXT1_MOFA,"Layer 'TEXT1_MOFA' carries 3 entities but is not in the layer map, so it was skipped. Add it to config.json if it holds structure.",,,
+info,layers,,,"34 of 71 layers carry no entities: Defpoints, REINF, DONUT, SUNK, SLAB CENTRE LINE, S- LEVEL, HATCH, TXT, 900MM SUNK, RECS_CUT OUT, RECS_CONCRETE, MOFA_BRICK WALL_05...",,,
+warning,setup,,,288 structural entities sit at a Z other than zero. They have been flattened to Z = 0 for extraction; confirm none of them was meant to be at a different level.,,,
+info,tags,,,"3 text objects on the beam tag layers do not read as marks and were skipped, e.g. ""/B44A; /B45A; /B46A"". Keep notes and legends off the tag layers.",,,
+warning,geometry,,COLUMN,"An outline on 'COLUMN' was open by 230 mm, about one wall thickness, and has been closed across the gap. Check the shape in the report, and close the polyline in the drawing.",2901163.2,85043.4,17907D
+info,geometry,,COLUMN,A closed 16-point outline on 'COLUMN' is not a rectangle. It has been carried through as a wall outline.,2901163.2,85043.4,17907D
+info,geometry,,COLUMN,"9 closed outlines were assembled from 36 loose lines on the column layers. They are drawn as separate lines rather than as one closed polyline, which looks identical on the sheet but is not a shape until it is stitched back together. Draw one closed polyline per element.",,,
+warning,geometry,,,29 beam or girder segments are drawn as plain lines or polylines rather than multilines. Their width is unknown and their line has been taken as the centreline without checking.,,,
+warning,geometry,,,"9 beams were drawn as two separate face lines rather than one centreline. Each pair has been merged into a single beam and its width measured from the gap between the faces (200, 230, 400, 650, 1503 mm). Draw one centreline per beam instead.",,,
+warning,geometry,,,"6 lines are one face of a beam whose other face has already been merged into it. They carry no width and no mark, and sit exactly half a beam width off the centreline of a beam that is already in the model, so they have been dropped. Left in, each becomes a thin extra beam pressed against a real one, ending in mid air.",511386.7,24668.6,
+info,geometry,,,"103 beam and girder centrelines were extended or trimmed to meet their neighbours, closing gaps of up to 800 mm left by moving each beam from its drawn face to its centre.",,,
+info,geometry,,,"24 beam ends were extended along their own line to reach the column, wall or beam that carries them. Moving a beam from its drawn face to its centreline leaves it short of its own support, and Revit cannot join a beam to something it does not touch.",,,
+warning,geometry,,,"11 beam ends still touch nothing. Extending them along their own line finds no column, wall or beam within 800 mm, so they have been left exactly as drawn rather than moved sideways to the nearest thing. Each one is a gap in the drawing: check them in CAD.",510186.5,24043.6,
+warning,geometry,,,"6 elements were left out: they sit 2390 m from the building, on their own, with no columns or tags around them. That is debris in the CAD file - a fragment dragged off the sheet or a stray paste - not structure. In Revit it would be a handful of beams alone in space. Delete them from the drawing.",510186.5,24043.6,
+info,geometry,,,6 detached elements in total were left out of the model.,,,
+warning,tags,1,,Mark '1' sits 462 mm from its element. Anything beyond 300 mm is matched on a best guess.,2901384.3,96270.9,179096
+warning,tags,10,,Mark '10' sits 520 mm from its element. Anything beyond 300 mm is matched on a best guess.,2924555.1,92280.6,179D35
+warning,tags,10A,,Mark '10A' sits 1036 mm from its element. Anything beyond 300 mm is matched on a best guess.,2938773.6,81336.6,179D2F
+blocker,tags,10A,,"Mark '10A' is 31353 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961837.6,59130.8,
+warning,tags,11,,Mark '11' sits 542 mm from its element. Anything beyond 300 mm is matched on a best guess.,2928405.6,93290.4,179D71
+warning,tags,12,,Mark '12' sits 485 mm from its element. Anything beyond 300 mm is matched on a best guess.,2932208.8,92396.6,179D51
+warning,tags,13,,Mark '13' sits 449 mm from its element. Anything beyond 300 mm is matched on a best guess.,2935914.6,93461.2,179D79
+warning,tags,15,,Mark '15' sits 504 mm from its element. Anything beyond 300 mm is matched on a best guess.,2909496.8,84832.5,179D5D
+warning,tags,16,,Mark '16' sits 519 mm from its element. Anything beyond 300 mm is matched on a best guess.,2917193.1,85240.7,179D3D
+warning,tags,17,,Mark '17' sits 580 mm from its element. Anything beyond 300 mm is matched on a best guess.,2924889.7,85385.7,179D45
+warning,tags,18,,Mark '18' sits 402 mm from its element. Anything beyond 300 mm is matched on a best guess.,2928554.0,85560.1,179D49
+warning,tags,19,,Mark '19' sits 651 mm from its element. Anything beyond 300 mm is matched on a best guess.,2932636.3,85827.2,179D4D
+warning,tags,2,,Mark '2' sits 474 mm from its element. Anything beyond 300 mm is matched on a best guess.,2908993.0,95210.4,179D65
+warning,tags,21,,Mark '21' sits 430 mm from its element. Anything beyond 300 mm is matched on a best guess.,2901952.0,80012.3,17908E
+blocker,tags,21,,"Mark '21' is 22420 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961453.6,96484.1,
+warning,tags,22,,Mark '22' sits 649 mm from its element. Anything beyond 300 mm is matched on a best guess.,2909826.5,80457.3,179D59
+blocker,tags,22,,"Mark '22' is 21963 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961418.7,88928.2,
+warning,tags,23,,Mark '23' sits 521 mm from its element. Anything beyond 300 mm is matched on a best guess.,2917348.0,80531.0,179D39
+blocker,tags,23,,"Mark '23' is 21705 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961509.7,81257.6,
+warning,tags,24,,Mark '24' sits 472 mm from its element. Anything beyond 300 mm is matched on a best guess.,2924964.1,80868.4,179D41
+blocker,tags,24,,"Mark '24' is 23097 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961503.9,73523.6,
+warning,tags,25,,Mark '25' sits 516 mm from its element. Anything beyond 300 mm is matched on a best guess.,2932663.9,81137.9,179D55
+blocker,tags,25,,"Mark '25' is 27304 mm from the nearest column or wall, too far to assign. Move the tag inside or within 300 mm of its element.",2961788.3,65243.6,
+warning,tags,3,,Mark '3' sits 655 mm from its element. Anything beyond 300 mm is matched on a best guess.,2916751.3,94638.4,179D69
+warning,tags,3A,,Mark '3A' sits 771 mm from its element. Anything beyond 300 mm is matched on a best guess.,2938647.8,92320.5,179D2D
+warning,tags,4,,Mark '4' sits 489 mm from its element. Anything beyond 300 mm is matched on a best guess.,2924324.8,95752.5,179D6D
+warning,tags,4A,,Mark '4A' sits 743 mm from its element. Anything beyond 300 mm is matched on a best guess.,2938499.9,95434.1,179D2E
+warning,tags,5,,Mark '5' sits 777 mm from its element. Anything beyond 300 mm is matched on a best guess.,2932040.6,95015.3,179D75
+warning,tags,7,,Mark '7' sits 435 mm from its element. Anything beyond 300 mm is matched on a best guess.,2901518.8,89886.2,179092
+warning,tags,7A,,Mark '7A' sits 877 mm from its element. Anything beyond 300 mm is matched on a best guess.,2938785.1,85889.3,179D30
+warning,tags,8,,Mark '8' sits 854 mm from its element. Anything beyond 300 mm is matched on a best guess.,2909278.1,90639.8,179D61
+warning,tags,9,,Mark '9' sits 981 mm from its element. Anything beyond 300 mm is matched on a best guess.,2916843.2,93280.3,179D31
+warning,tags,FC1,,Mark 'FC1' sits 1240 mm from its element. Anything beyond 300 mm is matched on a best guess.,2911359.4,92193.7,179D0F
+warning,tags,FC2,,Mark 'FC2' sits 1299 mm from its element. Anything beyond 300 mm is matched on a best guess.,2899807.4,93565.5,17909C
+warning,tags,FC2A,,Mark 'FC2A' sits 865 mm from its element. Anything beyond 300 mm is matched on a best guess.,2905288.2,89324.9,179D19
+warning,tags,FC3,,Mark 'FC3' sits 1832 mm from its element. Anything beyond 300 mm is matched on a best guess.,2920415.5,90219.7,179D14
+warning,tags,FC4,,Mark 'FC4' sits 499 mm from its element. Anything beyond 300 mm is matched on a best guess.,2913248.4,85430.8,179D1E
+warning,tags,FC5,,Mark 'FC5' sits 1261 mm from its element. Anything beyond 300 mm is matched on a best guess.,2919242.5,85353.4,179D23
+warning,tags,FC6,,Mark 'FC6' sits 1199 mm from its element. Anything beyond 300 mm is matched on a best guess.,2934616.8,86030.3,179D28
+warning,tags,LW1,,Mark 'LW1' sits 1156 mm from its element. Anything beyond 300 mm is matched on a best guess.,2899746.7,83834.5,17907E
+warning,tags,LW2,,Mark 'LW2' matches an element that is already tagged. One of the two tags is on the wrong element or is a duplicate.,2899768.0,85836.3,179082
+blocker,tags,,,"1 column or wall outlines carry no mark, so nothing connects them to a schedule row. Tag every element.",,,
+info,geometry,,,"1 beam lines ran over a column part-way along and were cut there into spans, because the line carried a separate mark for each bay.",,,
+warning,tags,B38,,Beam mark 'B38' sits 304 mm from the line it was given and was matched on a best guess.,2925983.6,83504.4,179180
+warning,tags,B7,,Beam mark 'B7' sits 326 mm from the line it was given and was matched on a best guess.,2912798.3,94568.6,17915F
+warning,tags,B9,,Beam mark 'B9' sits 332 mm from the line it was given and was matched on a best guess.,2928071.7,95104.0,179161
+warning,tags,B25,,Beam mark 'B25' sits 342 mm from the line it was given and was matched on a best guess.,2902827.0,87367.7,17917B
+warning,tags,B63,,Beam mark 'B63' sits 346 mm from the line it was given and was matched on a best guess.,2940495.2,78869.0,18A826
+warning,tags,B6,,Beam mark 'B6' sits 360 mm from the line it was given and was matched on a best guess.,2904196.7,94231.8,17915E
+warning,tags,B8,,Beam mark 'B8' sits 370 mm from the line it was given and was matched on a best guess.,2919485.8,94762.2,179160
+warning,tags,B10,,Beam mark 'B10' sits 393 mm from the line it was given and was matched on a best guess.,2934687.2,95279.9,179162
+blocker,tags,B44,,"Beam mark 'B44' was not placed. The nearest beam face is 21416 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2960960.0,92422.6,
+blocker,tags,B45,,"Beam mark 'B45' was not placed. The nearest beam face is 19806 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2960972.1,85730.5,
+blocker,tags,B46,,"Beam mark 'B46' was not placed. The nearest beam face is 19177 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2960987.7,77064.3,
+blocker,tags,B47,,"Beam mark 'B47' was not placed. The nearest beam face is 19243 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2959599.3,70077.5,
+blocker,tags,B48,,"Beam mark 'B48' was not placed. The nearest beam face is 23683 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2959977.9,62208.8,
+blocker,tags,B44A,,"Beam mark 'B44A' was not placed. The nearest beam face is 18919 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2958427.5,92976.1,
+blocker,tags,B45A,,"Beam mark 'B45A' was not placed. The nearest beam face is 17696 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2958770.1,85846.9,
+blocker,tags,B46A,,"Beam mark 'B46A' was not placed. The nearest beam face is 17399 mm away and every line within 700 mm already carries a mark, so the beam it names is probably not drawn on this plan. Confirm whether it belongs to another level.",2959213.0,77557.1,
+warning,tags,,,1 beam or girder segments carry no mark. Some will be spans of an already-tagged beam; the rest need tagging.,,,
+info,schedule,,,"3 beams are set off the level by the beam schedule's remarks (""N MM SUNK"" drops the top, ""BT@ +0.200M"" raises it): B91 -100, BC6 -150, EB1 -150.",,,
+warning,schedule,B52,,"Beam B52: the schedule's remarks say BEAM @ LVL 10.25M; BEAM @ LVL 9.5M. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+warning,schedule,B54,,"Beam B54: the schedule's remarks say BEAM @ LVL 10.25M; BEAM @ LVL 9.5M. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+warning,schedule,GB4,,"Beam GB4: the schedule's remarks say PARTIALLY 100MM SUNK. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+warning,schedule,GB5,,"Beam GB5: the schedule's remarks say PARTIALLY 100MM SUNK. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+warning,schedule,GB6,,"Beam GB6: the schedule's remarks say PARTIALLY 100MM SUNK. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+warning,schedule,GB7,,"Beam GB7: the schedule's remarks say PARTIALLY 100MM SUNK. That is a stepped, inverted or absolute-level beam, which the remark alone cannot place, so it is built flush with the level. Model its level by hand.",,,
+info,schedule,,,"The slab schedule marks these slabs as sunk, and they are built that far below the level: S1 400 mm, S2 400 mm, S3 150 mm, S8A 100 mm.",,,
+info,schedule,,,"The beam schedule printed on the drawing was read: 59 rows giving 103 marks their width and depth. 108 of the 113 beams now carry a real depth instead of a default. 17 rows were not in the expected shape (continuation lines, headers and notes) and were skipped.",,,
+info,schedule,,,"The slab schedule printed on the drawing was read: 10 marks with a thickness, matching 72 of the 72 slab tags.",,,
+warning,schedule,,,"5 beams have no size from the schedule and will be built at the default depth. 4 marks are on the plan but not in the schedule: B175, B176, B66, B83",,,
+info,slabs,,,"A bay closed by beams (1.9 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2938774.9,87493.2,
+info,slabs,,,"A bay closed by beams (1.2 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2932464.4,91558.7,
+info,slabs,,,"A bay closed by beams (1.2 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2931100.2,91510.4,
+info,slabs,,,"A bay closed by beams (0.9 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2923629.9,87222.5,
+info,slabs,,,"A bay closed by beams (1.0 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2917089.9,91049.0,
+info,slabs,,,"A bay closed by beams (0.3 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2916225.4,91018.3,
+info,slabs,,,"A bay closed by beams (1.3 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2909824.0,86726.5,
+info,slabs,,,"A bay closed by beams (3.6 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2900193.3,85973.8,
+info,slabs,,,"A bay closed by beams (3.6 m2) has no slab mark written in it, so no slab was built there (no mark, no slab). If it is slab, write its mark in the bay on the drawing.",2900182.5,83989.1,
+warning,slabs,S1/S2,,"Slab marks S1 and S2 (S1 200, S2 200 mm) sit in one bay with no beam between them, so they were built as one panel at 200 mm, the thicker. If a beam divides them on the drawing, it was not extracted.",2935424.1,96907.3,
+warning,slabs,S1/S2,,"Slab marks S1 and S2 (S1 200, S2 200 mm) sit in one bay with no beam between them, so they were built as one panel at 200 mm, the thicker. If a beam divides them on the drawing, it was not extracted.",2920110.8,96444.6,
+warning,slabs,S1/S2,,"Slab marks S1 and S2 (S1 200, S2 200 mm) sit in one bay with no beam between them, so they were built as one panel at 200 mm, the thicker. If a beam divides them on the drawing, it was not extracted.",2912455.6,96173.3,
+warning,slabs,S1/S2,,"Slab marks S1 and S2 (S1 200, S2 200 mm) sit in one bay with no beam between them, so they were built as one panel at 200 mm, the thicker. If a beam divides them on the drawing, it was not extracted.",2904784.4,96352.1,
+info,slabs,,,"18 slab folds (the paired red lines on the slab layer) are built as framing, each from the top of the higher slab to the underside of the lower one.",,,
+warning,slabs,,,"2 slab folds do not have a slab on both sides, so their depth cannot be read and they are not built. See the folds in model.json.",,,
+info,slabs,,,"2 slab outlines are drawn; for the other marks 74 panels were taken from the bays the beams enclose, each with the slab mark inside it and that mark's scheduled thickness. Panels run to the beam faces. 9 closed bays hold no slab mark and were left open: no mark, no slab.",,,
+info,beams,,,"2 beam ends stopped at the face of a floating column, which starts on the slab and would have stood on nothing. They now run under it: B53 under FC2 +525, B54 under FC2 +525.",,,
+warning,geometry,,BEAM,"99 multilines on 'BEAM' are justified Top, so the drawn line is a beam face rather than the centreline. Each centreline has been recovered 115 mm off the drawn line. Set multiline justification to Zero so this correction is not needed.",,,
+warning,geometry,,BEAM,"1 multilines on 'BEAM' are justified Top, so the drawn line is a beam face rather than the centreline. Each centreline has been recovered 200 mm off the drawn line. Set multiline justification to Zero so this correction is not needed.",,,
+info,setting out,,,"No shared base point is set, so local coordinates are measured from the south-west corner of the columns at (2900949, 80090). Set 'base_point' in config.json once the shared point is agreed with the architect.",,,

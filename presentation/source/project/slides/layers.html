@@ -1,0 +1,38 @@
+<section id="layers" style="background:#F7F6F2; color:#16202B; font-family:'IBM Plex Sans', Arial, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:44px">
+  <div style="display:flex; flex-direction:column; gap:20px">
+    <p style="font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; letter-spacing:2px; text-transform:uppercase; color:#A4500F">Standard &#183; section 04</p>
+    <h2 style="font-size:60px; font-weight:600; line-height:1.1; width:1500px">One layer per element type, and a tag layer for each</h2>
+  </div>
+  <div style="display:flex; gap:40px">
+    <table style="flex:1; font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; padding:12px 16px">
+      <tr style="background:#16202B">
+        <th style="width:44%; color:#F7F6F2; text-align:left; font-size:24px">Layer</th>
+        <th style="width:56%; color:#F7F6F2; text-align:left; font-size:24px">What goes on it</th>
+      </tr>
+      <tr><td>S-COL</td><td>Columns continuing up</td></tr>
+      <tr style="background:#FDFCF9"><td>S-COL-STOP</td><td>Columns stopping here</td></tr>
+      <tr><td>S-COL-FLOAT</td><td>Floating columns</td></tr>
+      <tr style="background:#FDFCF9"><td>S-WALL</td><td>Lift and pardi walls, 230</td></tr>
+      <tr><td>S-BEAM</td><td>Beam centrelines</td></tr>
+      <tr style="background:#FDFCF9"><td>S-GIRDER</td><td>Girder centrelines</td></tr>
+      <tr><td>S-SLAB</td><td>One outline per panel</td></tr>
+    </table>
+    <table style="flex:1; font-family:'IBM Plex Sans', Arial, sans-serif; font-size:24px; color:#16202B; padding:12px 16px">
+      <tr style="background:#16202B">
+        <th style="width:44%; color:#F7F6F2; text-align:left; font-size:24px">Layer</th>
+        <th style="width:56%; color:#F7F6F2; text-align:left; font-size:24px">What goes on it</th>
+      </tr>
+      <tr><td>S-SUNK-100/150/400</td><td>Sunk zones, by depth</td></tr>
+      <tr style="background:#FDFCF9"><td>S-OPEN</td><td>Openings and cut-outs</td></tr>
+      <tr><td>S-STAIR</td><td>Stairs and landings</td></tr>
+      <tr style="background:#FDFCF9"><td>S-GRID</td><td>Grid lines and bubbles</td></tr>
+      <tr><td>S-REF</td><td>Base point, level marks</td></tr>
+      <tr style="background:#FDFCF9"><td>S-ANNO</td><td>Notes, legend, title block</td></tr>
+      <tr><td>...-TAG</td><td>One per element layer</td></tr>
+    </table>
+  </div>
+  <p style="font-size:28px; color:#4C5A66; width:1500px; line-height:1.4">The current file already separates COLUMN, BEAM and GIRDER BEAM. What it lacks is a wall layer, a usable slab layer, a grid layer, and sunk layers whose names match their depth.</p>
+  <p style="position:absolute; left:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">J-1153 &#183; Wing C &#183; Structural CAD to Revit</p>
+  <p style="position:absolute; right:128px; bottom:64px; font-family:'JetBrains Mono', Courier New, monospace; font-size:24px; color:#5F6C77">15</p>
+  <aside>Say plainly that these names are a proposal, not a house rule to defend. If the consultant already runs a layer standard, we map ours onto theirs once and the script follows their names.</aside>
+</section>

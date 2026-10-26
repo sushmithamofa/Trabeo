@@ -1,0 +1,63 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-09-25T06:30:00Z" },
+  "title": "CAD to Revit Automation — J-1153",
+  "order": [
+    "cover",
+    "summary",
+    "today",
+    "prize",
+    "pipeline",
+    "strengths",
+    "blockers",
+    "audit-columns",
+    "audit-beams",
+    "centreline",
+    "audit-slabs",
+    "scorecard",
+    "standard-map",
+    "setup",
+    "layers",
+    "elements",
+    "tags",
+    "revit-template",
+    "ask",
+    "questions",
+    "roadmap",
+    "close"
+  ],
+  "cover": "cover",
+  "sections": {
+    "why": {
+      "description": "Why the structural model should come out of the consultant's CAD instead of being redrawn by hand.",
+      "start": "cover"
+    },
+    "how": {
+      "description": "The five-step pipeline from DWG and Excel to a checked Revit model.",
+      "start": "pipeline"
+    },
+    "audit": {
+      "description": "What the Wing C drawing already gives us, and the 21 issues that stop a script.",
+      "start": "strengths"
+    },
+    "standard": {
+      "description": "The drawing standard that makes every future floor automatable, layer by layer and rule by rule.",
+      "start": "standard-map"
+    },
+    "next": {
+      "description": "What we need from the consultant, the open questions, and the pilot floor.",
+      "start": "ask"
+    }
+  },
+  "faces": {
+    "ibm-plex-sans": {
+      "family": "IBM Plex Sans",
+      "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap"
+    },
+    "jetbrains-mono": {
+      "family": "JetBrains Mono",
+      "href": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
+    }
+  },
+  "designSystems": []
+}

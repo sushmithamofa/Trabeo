@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Structural Drawing Guidelines</title>
+<style>
+:root{--ink:#16202B;--mute:#5a6670;--line:#dcd8cf;--accent:#1f6fb2;--soft:#eef4fa;--ok:#2e8b57;--bad:#c0392b;--warn:#fff7e3;--warnb:#ead8a4}
+*{box-sizing:border-box}
+html{background:#e9e7e1}
+body{margin:0;font:15px/1.55 'Segoe UI',system-ui,Arial,sans-serif;color:var(--ink)}
+.page{max-width:860px;margin:28px auto;background:#fff;padding:56px 64px 48px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{font-size:30px;line-height:1.2;margin:0 0 8px;letter-spacing:-.3px}
+h2{font-size:21px;margin:38px 0 10px;padding-top:6px;border-top:2px solid var(--ink)}
+h2 .n{color:var(--accent);margin-right:8px}
+h3{font-size:16.5px;margin:22px 0 6px}
+p{margin:0 0 10px}
+.sub{font-size:17px;color:var(--mute);margin-bottom:22px}
+.meta{display:grid;grid-template-columns:150px 1fr;gap:4px 16px;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:0 0 20px}
+.meta b{color:var(--mute);font-weight:600}
+.rule{background:var(--soft);border-left:5px solid var(--accent);padding:16px 20px;margin:18px 0;border-radius:0 8px 8px 0;font-size:16px}
+.rule b.big{display:block;font-size:19px;margin-bottom:4px}
+.warn{background:var(--warn);border:1px solid var(--warnb);border-radius:8px;padding:12px 16px;margin:14px 0}
+table{width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:14px}
+th{text-align:left;background:#f1efe9;padding:8px 10px;font-size:12.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--mute);border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr{break-inside:avoid}
+td .t{white-space:normal;line-height:1.7}
+code,.t{font-family:Consolas,'Courier New',monospace;font-size:13.5px;background:#f4f2ec;border:1px solid #e6e2d8;border-radius:4px;padding:0 5px;white-space:nowrap}
+.yes{color:var(--ok);font-weight:700}.no{color:var(--bad);font-weight:700}
+ol.flow{counter-reset:f;list-style:none;padding:0;margin:12px 0}
+ol.flow li{counter-increment:f;position:relative;padding:0 0 10px 42px}
+ol.flow li::before{content:counter(f);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+ul{margin:4px 0 12px;padding-left:22px}li{margin:3px 0}
+.check{list-style:none;padding:0;margin:8px 0 14px}
+.check li{position:relative;padding:6px 0 6px 34px;border-bottom:1px dashed var(--line)}
+.check li::before{content:'';position:absolute;left:4px;top:8px;width:16px;height:16px;border:2px solid var(--ink);border-radius:3px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.ex{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.ex h4{margin:0 0 6px;font-size:14px}
+.ex.good h4{color:var(--ok)}.ex.bad h4{color:var(--bad)}
+.foot{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mute)}
+@media print{
+ @page{size:A4;margin:16mm 15mm 16mm}
+ html{background:#fff}
+ .page{max-width:none;margin:0;padding:0;box-shadow:none}
+ body{font-size:12.2px}
+ h1{font-size:25px}h2{font-size:17.5px;margin-top:24px;break-after:avoid}h3{font-size:14px;break-after:avoid}
+ table{font-size:11.5px}th{font-size:10.5px}
+ .rule,.warn,.ex,table,.meta{break-inside:avoid}
+ code,.t{font-size:11px}
+ .pb{break-before:page}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (max-width:700px){.page{padding:28px 18px}.cols{grid-template-columns:1fr}.meta{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Structural Drawing Guidelines</h1>
+<p class="sub">How to prepare structural CAD drawings so the Revit model can be built from them directly, without redrawing and without guesswork.</p>
+<div class="meta">
+ <b>For</b><span>Structural consultants issuing DWG / DXF drawings to us</span>
+ <b>From</b><span>MOFA Studios Pvt. Ltd.</span>
+ <b>Version</b><span>1.0 · October 2026</span>
+</div>
+
+<h2><span class="n">1</span>Why this matters</h2>
+<p>We build the structural Revit model from your CAD drawings with our own software, instead of redrawing them by hand. It reads the plans, finds every column, beam, slab and wall, and matches each one to its mark and size wherever those are written in the drawing set: on the plan, in a schedule, in a detail or in a section.</p>
+<p>The software <b>never guesses</b>. If an element has no mark, or its mark has no size anywhere in the set, it is not modelled with a made-up value. It comes back to you as a query. So the more complete and consistent the drawings, the fewer queries you get and the faster the model is ready.</p>
+<p><b>We are not asking you to change your drafting style, layer names or CAD package.</b> The software adapts to each consultant's way of drawing. What we need is what every good structural set already has: every element marked, and every mark sized.</p>
+
+<div class="rule"><b class="big">The golden rule</b>Every column, beam, slab, wall and footing must carry a <b>mark</b> on the plan, and every mark must have a <b>size</b> written somewhere in the drawing set: on the plan, in a schedule, in a detail or in a section.</div>
+
+<h2><span class="n">2</span>How the software reads your drawings</h2>
+<p>Knowing the order it works in explains most of the rules below.</p>
+<ol class="flow">
+ <li><b>Sorts the sheets by their titles.</b> Each view is classified from its title, for example <span class="t">FIRST FLOOR FRAMING PLAN</span>, <span class="t">COLUMN LAYOUT</span>, <span class="t">FOUNDATION PLAN</span>, <span class="t">BEAM SCHEDULE</span> or <span class="t">SECTION X-X</span>. The floor is read from the title and the file name.</li>
+ <li><b>Finds the elements by their geometry.</b> Closed outlines on a column layer are columns. Pairs of parallel lines (or centrelines) on a beam layer are beams. Areas closed by beams and slab edges are slab panels.</li>
+ <li><b>Reads the marks</b> written beside or inside each element, such as <span class="t">C12</span>, <span class="t">B47</span>, <span class="t">S3</span> or <span class="t">LW1</span>.</li>
+ <li><b>Finds each mark's size</b> in every place it is written: a plan label <span class="t">B12(230X600)</span>, a schedule row, a detail caption or a dimensioned section.</li>
+ <li><b>Cross-checks every source.</b> When all the sources agree, the value is used. When they disagree, or say nothing, the element is flagged for a decision, and that usually means a query to you.</li>
+</ol>
+
+<h2><span class="n">3</span>What each element needs</h2>
+<table>
+ <tr><th style="width:15%">Element</th><th style="width:28%">On the plan</th><th style="width:33%">Its size, in at least one place</th><th>Example</th></tr>
+ <tr><td><b>Column</b></td><td>Closed outline at its true size, with its mark beside or inside it</td><td>Column schedule (per floor if it changes), or a plan label with the size</td><td><span class="t">C12</span> + schedule row <span class="t">C12 | 230 x 600</span></td></tr>
+ <tr><td><b>Beam / girder</b></td><td>Drawn at its real width, mark written along the beam</td><td>Plan label with the size, beam schedule, or beam detail / section</td><td><span class="t">B12(230X600)</span> or <span class="t">B12</span> with <span class="t">230X600</span> under it</td></tr>
+ <tr><td><b>Slab</b></td><td>Mark written <b>inside every panel</b>, including repeated panels</td><td>Slab schedule, a thickness with the mark, or a general note</td><td><span class="t">S1</span> + <span class="t">150 THK</span>, or <span class="t">ALL SLABS ARE 125mm THK UNLESS OTHERWISE SPECIFIED</span></td></tr>
+ <tr><td><b>Sunk slab</b></td><td>Outline or hatch of the sunk area</td><td>The depth written: a legend row or text inside the area</td><td><span class="t">THUS MARKED 150 MM SUNK SLAB</span> or <span class="t">150MM SUNK</span> inside</td></tr>
+ <tr><td><b>Wall / lift core</b></td><td>Closed outline on a wall layer, with its mark</td><td>Thickness drawn true, or in a schedule / note</td><td><span class="t">LW1</span>, <span class="t">SW2</span>, <span class="t">RW1</span></td></tr>
+ <tr><td><b>Footing</b></td><td>Outline on the foundation plan, with its mark</td><td>Footing schedule with size, depth and <b>founding level</b></td><td><span class="t">F3 | 1800 x 1800 | 450 | -1.800</span></td></tr>
+ <tr><td><b>Opening / cut-out</b></td><td>Closed outline with an <b>X</b> drawn across it</td><td>Not needed. The outline is the size.</td><td>Shaft, duct, lift well</td></tr>
+</table>
+
+<div class="warn"><b>No mark, no element.</b> A slab panel with no slab mark in it gets no slab. A beam with no mark and no size anywhere is only built as a placeholder, marked for a decision. Please don't leave panels or beams unmarked because "it is obvious". The software cannot assume what is obvious to an engineer.</div>
+
+<h2 class="pb"><span class="n">4</span>Marks</h2>
+<h3>4.1 Write marks the same way throughout</h3>
+<ul>
+ <li>Use the usual prefixes. Recognised examples:
+  <ul>
+   <li>Beams: <span class="t">B</span> <span class="t">GB</span> <span class="t">PB</span> <span class="t">LB</span> <span class="t">TB</span> <span class="t">RB</span> <span class="t">CB</span> <span class="t">BK</span> <span class="t">BKT</span></li>
+   <li>Columns: <span class="t">C</span> <span class="t">FC</span> <span class="t">SC</span> <span class="t">COL</span></li>
+   <li>Slabs: <span class="t">S</span> <span class="t">TS</span> <span class="t">RS</span> <span class="t">CS</span></li>
+   <li>Walls: <span class="t">SW</span> <span class="t">LW</span> <span class="t">RW</span> <span class="t">CW</span></li>
+   <li>Footings: <span class="t">F</span> <span class="t">IF</span> <span class="t">CF</span> <span class="t">PF</span> <span class="t">RF</span> <span class="t">FTG</span></li>
+  </ul>
+  Your own prefixes work too (for example <span class="t">SL1</span> or <span class="t">P1</span> for slabs). The software learns what they mean from your <b>schedule titles</b> and from <b>where the marks sit</b> on the plan, so always title each schedule (section 6) and use one prefix for one kind of element.</li>
+ <li>The <b>same mark means the same size</b> on the same floor. If two beams differ, give them different marks (<span class="t">B12</span>, <span class="t">B12A</span>).</li>
+ <li>The mark on the plan must be <b>spelt exactly as in the schedule</b>.
+  <ul>
+   <li>Capitals, spaces and a hyphen after the letters don't matter: <span class="t">S1</span>, <span class="t">S-1</span> and <span class="t">s 1</span> are the same mark.</li>
+   <li>Everything else does. <span class="t">S01</span> and <span class="t">S1</span> are different marks, and so are <span class="t">S1-2</span> and <span class="t">S12</span>, or <span class="t">B12</span> and <span class="t">BM12</span>.</li>
+  </ul>
+  Write them the same way on the plan and in the schedule.</li>
+ <li><b>Every mark on the plan has a schedule row or a size</b>, and every schedule row has its mark on the plan.</li>
+</ul>
+<h3>4.2 Place marks so they clearly belong to one element</h3>
+<ul>
+ <li>Beam marks run <b>along their beam</b>, close to it, nearer to it than to any other beam.</li>
+ <li>Column marks sit inside or right beside the column outline.</li>
+ <li>Slab marks sit <b>inside the panel</b>, not on a beam line or across two panels.</li>
+ <li><b>One mark per text object.</b> Write <span class="t">B107</span> and <span class="t">BP</span> as two texts, not <span class="t">B107/BP</span>.</li>
+ <li>Marks are live text (TEXT / MTEXT), not exploded into lines, and not stacked on top of another mark.</li>
+</ul>
+<div class="cols">
+ <div class="ex good"><h4>✓ Reads cleanly</h4><span class="t">B12(230X600)</span> along the beam<br><span class="t">B12</span> with <span class="t">230X600</span> directly under it<br><span class="t">S3</span> centred in its panel, <span class="t">150 THK</span> under it<br><span class="t">C7</span> inside the column outline</div>
+ <div class="ex bad"><h4>✗ Causes queries</h4><span class="t">B107/BP</span> (two marks in one text)<br>A beam mark 2 m away, nearer another beam<br><span class="t">S1</span> written on the beam between two panels<br>Marks drawn as exploded lines or inside a block</div>
+</div>
+
+<h2><span class="n">5</span>Sizes</h2>
+<ul>
+ <li>Sizes in <b>millimetres</b>, <b>width × depth</b>: <span class="t">230X600</span>, <span class="t">230 x 600</span>, <span class="t">230×600</span>. Slab thickness as <span class="t">150 THK</span> or <span class="t">(150 THK)</span>.</li>
+ <li>State the units once in the general notes: <span class="t">ALL DIMENSIONS ARE IN MM</span>.</li>
+ <li>A size can be written <b>after the mark</b> <span class="t">GB1(230x450)</span>, <b>with a colon</b> <span class="t">GB1:230x450</span>, or <b>directly under the mark</b>.</li>
+ <li><b>Varying depth</b> (deeper at one end): write both depths, <span class="t">850/750</span>, and give a section showing which end is which.</li>
+ <li><b>Draw elements at their real size.</b> The drawn width of a beam and the outline of a column are measured and compared with the written size. A beam drawn at 230 but labelled 300 wide is flagged as a conflict.</li>
+ <li>Don't put sizes only in layer names (e.g. <span class="t">BEAM-230X600</span>). They are used only as a hint, and a layer name left over from an old revision causes conflicts.</li>
+</ul>
+
+<h2><span class="n">6</span>Schedules</h2>
+<p>Schedules are where most sizes come from. The software finds a schedule by its <b>header words</b>, wherever it sits on the sheet, so the header matters most.</p>
+<ul>
+ <li>Give each schedule a <b>title</b>: <span class="t">BEAM SCHEDULE</span>, <span class="t">COLUMN SCHEDULE</span>, <span class="t">SLAB SCHEDULE</span>, <span class="t">FOOTING SCHEDULE</span>. If the project has several wings or blocks, name it in the title: <span class="t">BEAM SCHEDULE - WING C</span>.</li>
+ <li>The <b>header row</b> needs a mark column and at least one size column, in plain words:
+  <ul>
+   <li>Mark column: <span class="t">MARK</span> <span class="t">BEAM NO.</span> <span class="t">TYPE</span> <span class="t">ID</span></li>
+   <li>Size columns: <span class="t">SIZE</span> <span class="t">B</span> <span class="t">D</span> <span class="t">WIDTH</span> <span class="t">DEPTH</span> <span class="t">THK</span></li>
+  </ul>
+  Headers two or three rows deep are fine (<span class="t">SIZE</span> over <span class="t">B</span> and <span class="t">D</span>).</li>
+ <li><b>One row per mark is best.</b> Grouped rows such as <span class="t">B2, 4, 7</span> are read, but each mark in the group must share every value in the row.</li>
+ <li><b>One value per cell</b>, in line with its row. No "as above", no ditto marks, no blank cells for sizes.</li>
+ <li>Real text, not exploded. Tables side by side are fine as long as each has its own title and header.</li>
+ <li><b>Columns that change size up the building</b>: give the size for each floor in the column schedule.</li>
+ <li><b>Footings</b>: the footing schedule must include the <b>founding level</b> (e.g. <span class="t">-1.800</span> or <span class="t">(-)1800</span>). Without it, footings cannot be placed.</li>
+</ul>
+
+<h2><span class="n">7</span>Details and sections</h2>
+<ul>
+ <li>Title each section with its cut letters, <span class="t">SECTION X-X</span>, and show the same letters on the plan where the cut is taken.</li>
+ <li>Write the mark and size under each beam or column detail: <span class="t">GB1 (230x450)</span>.</li>
+ <li>Use <b>real dimension lines with their numbers</b> on shaped sections (edge beams, drop beams, upturned beams). Every corner needs a written dimension. A part shown without a dimension cannot be modelled.</li>
+ <li>Give <b>levels</b> where they change: sunk slabs, stepped beams, landings, top of footings. Write levels as <span class="t">+3.000 SFL</span> / <span class="t">FFL</span>, and keep structural (SFL / TOS) and finished (FFL) levels clearly apart.</li>
+</ul>
+
+<h2 class="pb"><span class="n">8</span>Drawing the plan</h2>
+<h3>8.1 The set and each sheet</h3>
+<ul>
+ <li>Every view has a clear <b>title naming what it is and which floor</b>: <span class="t">STR. LAYOUT AT 1ST FLOOR LVL</span>, <span class="t">FOUNDATION PLAN</span>, <span class="t">COLUMN LAYOUT</span>.</li>
+ <li>The floor in the <b>title and the file name must agree</b>. A file named <i>3rd floor</i> whose title says <i>1st floor</i> is flagged.</li>
+ <li><b>Each floor in its own CAD file</b>, with that floor's sections and details, named with the wing and floor: <i>J1153 - 2ND FLOOR PLAN (C WING).dwg</i>. Several floors in one file can still be read, but the software then has to work out which plan, section and schedule belong together. Beam marks that repeat from floor to floor make that error-prone. Common schedules and typical details may stay in one shared file.</li>
+ <li><b>One framing plan per floor</b> per wing. If one plan serves several floors, say so: <span class="t">TYPICAL 2ND TO 5TH FLOOR</span>.</li>
+ <li>Millimetres, drawn <b>1:1</b>, nothing scaled or exploded.</li>
+ <li>Every floor at the <b>same origin and rotation</b>, so the plans sit exactly on top of each other. Keep the grid on every plan.</li>
+ <li>Mark parts that are <b>not in scope</b> (existing block, other building, N.I.C.) with a note or outline. Otherwise they are modelled too.</li>
+</ul>
+<h3>8.2 Layers</h3>
+<ul>
+ <li>Any layer names are fine. <b>Keep them the same from one issue to the next.</b></li>
+ <li><b>One kind of thing per layer</b>: columns, beams, slabs, walls, sunk areas, openings, text, hatching, dimensions. Don't mix columns and walls, or beams and outlines.</li>
+ <li>Only beams on the beam layer. <b>Don't draw shaft or duct boxes, lift walls or slab edges on the beam layer.</b> Every line there is read as part of a beam.</li>
+ <li>Structural elements in model space, not inside blocks or xrefs.</li>
+</ul>
+<h3>8.3 Elements</h3>
+<table>
+ <tr><th style="width:18%">Element</th><th>How to draw it</th></tr>
+ <tr><td><b>Columns</b></td><td>One <b>closed</b> outline per column at its true size. Floating columns on their own layer, or marked <span class="t">FC</span>.</td></tr>
+ <tr><td><b>Beams</b></td><td>Either <b>both faces</b> at the real width, or <b>one centreline</b>. Use one way throughout. If faces are dashed under the slab and solid at edges, do it consistently. Curved beams as true arcs.</td></tr>
+ <tr><td><b>Angled beams</b></td><td><b>Write the angle.</b> A beam at an angle on plan: draw it at its true angle, both ends on their supports, and write the angle beside the mark: <span class="t">B14(230X600) 30°</span>. A sloping beam (rising from one end to the other): write the angle and the top level at both ends, <span class="t">B9 SLOPING 20° TOB +3.000 TO +4.250</span>, and show it in a section.</td></tr>
+ <tr><td><b>Slabs</b></td><td>Every panel <b>closed</b> by beams, walls or a slab edge line, with no gaps at corners. One mark inside each panel.</td></tr>
+ <tr><td><b>Walls / cores</b></td><td>Closed outline on a wall layer, at the real thickness, with its mark (<span class="t">LW1</span>). Not on the column layer, and not again on the beam layer.</td></tr>
+ <tr><td><b>Openings</b></td><td>Closed outline with an <b>X</b> across it, on an opening or cut-out layer.</td></tr>
+ <tr><td><b>Sunk areas</b></td><td>Closed outline or hatch, with the depth written in the legend or inside the area.</td></tr>
+ <tr><td><b>Duplicates</b></td><td>Nothing drawn twice on top of itself. Run <span class="t">OVERKILL</span> before issue.</td></tr>
+</table>
+
+<h2><span class="n">9</span>What happens if something is missing</h2>
+<table>
+ <tr><th style="width:40%">In the drawing</th><th>What happens</th></tr>
+ <tr><td>Mark and size agree everywhere</td><td><span class="yes">Modelled</span> directly</td></tr>
+ <tr><td>Plan label says 230X600, schedule says 230X450</td><td><span class="no">Conflict</span>: not modelled until confirmed. Query to you</td></tr>
+ <tr><td>Mark with no size anywhere</td><td><span class="no">Missing</span>: placeholder at most, marked for a decision. Query to you</td></tr>
+ <tr><td>Slab panel with no mark</td><td><span class="no">No slab</span> in that panel. Query to you</td></tr>
+ <tr><td>Footing with no founding level</td><td><span class="no">Footing not placed</span>. Query to you</td></tr>
+ <tr><td>Mark spelt differently on plan and schedule (<span class="t">S01</span> / <span class="t">S1</span>)</td><td><span class="no">Not matched</span>: flagged as a possible match and confirmed by hand. Query to you</td></tr>
+ <tr><td>An unusual prefix in an untitled schedule</td><td>Its meaning may be unclear: flagged for a decision. Please title the schedule</td></tr>
+ <tr><td>Box drawn on the beam layer with no X</td><td>May be read as beams. Please draw openings with an X on their own layer</td></tr>
+</table>
+
+<h2><span class="n">10</span>Checklist before each issue</h2>
+<ul class="check">
+ <li>Every <b>column</b> has a mark, and its size is in the column schedule (per floor) or written beside it</li>
+ <li>Every <b>beam</b> has a mark along it, and its size is in a label, the beam schedule or a detail</li>
+ <li>Every <b>slab panel</b> has a mark inside it, and every slab mark has a thickness (schedule, label or general note)</li>
+ <li>Every <b>wall / lift core</b> has a mark and a thickness</li>
+ <li>Every <b>footing</b> has a mark, a size, a depth and a founding level</li>
+ <li>Every <b>sunk area</b> has its depth written, and every <b>opening</b> is a closed outline with an X</li>
+ <li>Marks on the plan are spelt exactly as in the schedules (same zeros, same separators), one mark per text, close to their element</li>
+ <li>One prefix means one kind of element throughout the set (not <span class="t">SB</span> for a slab band on one sheet and a beam on another)</li>
+ <li>Every mark on the plan has a schedule row, and every schedule row has a mark on the plan</li>
+ <li>Each schedule has a title and a header row (mark column + size columns), one value per cell</li>
+ <li>Varying-depth beams show both depths and a section</li>
+ <li>Angled beams have their angle written beside the mark. Sloping beams also have the top level at both ends and a section</li>
+ <li>Each floor is its own CAD file, named with the wing and floor</li>
+ <li>Sheet titles name the plan type and floor, and match the file name</li>
+ <li>Units are millimetres, drawn 1:1, every floor at the same origin and rotation</li>
+ <li>One kind of thing per layer, layer names unchanged from the last issue, nothing else on the beam layer</li>
+ <li>Columns, walls, openings and slab panels are closed. No duplicates (<span class="t">OVERKILL</span> run)</li>
+ <li>Levels given where they change (sunk slabs, steps, landings, footings). Changes since the last issue listed</li>
+</ul>
+
+<p style="margin-top:18px">Questions about these guidelines, or would you like us to test one floor before you adopt them? Contact <b>MOFA Studios Pvt. Ltd.</b> We are happy to run a trial file through the software and send you its queries, so any gaps show up on one floor rather than on the whole project.</p>
+
+<div class="foot">Structural Drawing Guidelines · v1.0 · October 2026 · MOFA Studios Pvt. Ltd.</div>
+</div>
+</body>
+</html>
