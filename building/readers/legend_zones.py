@@ -22,7 +22,10 @@ from ..model import Building, Element, Evidence, Value, READ
 READER = "legend_zones"
 ROW = re.compile(r"THUS\s+MARKED\s+(.+)", re.I)
 KINDS = [("sunk", r"\bSUNK\b|\bDOWN\b"), ("sloping slab", r"SLOP"), ("steel roof", r"FABRICAT|STEEL\s+ROOF|SHEET"),
-         ("column ends", r"COLUMN.*\bENDS?\b|\bENDS?\b.*COLUMN"), ("column through", r"COLUMN.*THROUGH"),
+         # a column ending here, however it is worded (ends, stops, terminates, discontinued, up to this level)
+         ("column ends", r"COLUMN.*(?:\bENDS?\b|\bENDING\b|\bSTOP|TERMINAT|DISCONTINU|NOT\s*CONTINU|UP\s*TO\s*TH)"
+                         r"|(?:\bENDS?\b|\bSTOP|TERMINAT|DISCONTINU).*COLUMN"),
+         ("column through", r"COLUMN.*THROUGH"),
          ("cut out", r"CUT\s*-?\s*OUT|OPENING|VOID|DUCT")]
 
 

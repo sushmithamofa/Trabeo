@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -208,6 +209,60 @@ def _underlay(s, els, run_dir=""):
     return {"o": [ox, oy], "s": flat, "u": _unused(boxes, els, roles)}
 
 
+DETAIL_KINDS = ("section", "beam_details", "column_details", "slab_details", "footing_details", "stair_details")
+_DETAIL_WORDS = re.compile(r"\bSECTION|\bDETAIL|\bELEVATION", re.I)
+# what a section or detail gave, in words
+_GAVE = {"level_mark": "level marker", "beam_section": "beam section shape", "section_cut": "section cut",
+         "building_section": "building section", "size_caption": "size", "spec": "spec", "stair": "stair",
+         "column_schedule_row": "column schedule row", "bar_callout": "bar callout"}
+
+
+def _details(b: Building) -> list[dict]:
+    """Every section and detail of the drawings, and what the app took from it: read (what it
+    gave, and how many elements elsewhere use it as a source), or not read (why). So nothing
+    drawn is passed over without it being said."""
+    made, used = {}, {}
+    for e in b.elements:
+        made.setdefault(e.sheet, {}).setdefault(e.type, 0)
+        made[e.sheet][e.type] += 1
+        cited = {ev.sheet for v in list(e.props.values()) + list(e.resolved.values())
+                 for ev in (getattr(v, "evidence", None) or []) if ev.sheet and ev.sheet != e.sheet}
+        for sid in cited:
+            used.setdefault(sid, set()).add(e.id)
+    out = []
+    for sid, s in b.sheets.items():
+        view = s.extra.get("view") or {}
+        if view.get("same_as"):
+            continue
+        stray = s.kind in ("stray", "overview")
+        if s.kind not in DETAIL_KINDS and not (stray and _DETAIL_WORDS.search(s.title or "")):
+            continue
+        if stray and (view.get("entities") or 0) < 5:
+            continue                    # a sheet's title on its own, nothing drawn
+        gave = made.get(sid, {})
+        n_used = len(used.get(sid, ()))
+        if stray:
+            why = ((s.extra.get("kind") or {}).get("reasons") or ["not read"])[0]
+            status, text = "not", "not read: " + why
+        elif gave or n_used or s.extra.get("wall_elevation"):
+            parts = [f"{n} {_GAVE.get(t, t.replace('_', ' '))}{'s' if n > 1 else ''}"
+                     for t, n in sorted(gave.items()) if t != "caption"]
+            we = s.extra.get("wall_elevation")
+            if we:
+                parts.append("where " + ", ".join(m for w in we["walls"] for m in w["marks"]) + " start and end")
+            if n_used:
+                parts.append(f"a source for {n_used} element{'s' if n_used > 1 else ''}")
+            status, text = "read", "read: " + (", ".join(parts) or "its texts")
+        else:
+            status, text = "nothing", "read: nothing the app can use was found in it yet"
+        if view.get("inside_blocks"):
+            text += " (drawn inside blocks)"
+        out.append({"id": sid, "title": s.title or sid, "kind": s.kind.replace("_", " "),
+                    "file": os.path.basename(s.file), "st": status, "text": text})
+    order = {"read": 0, "nothing": 1, "not": 2}
+    return sorted(out, key=lambda d: (order[d["st"]], d["file"], d["title"]))
+
+
 def data(b: Building, decisions: dict | None = None, run_dir: str = "") -> dict:
     from building.export import left_out
     sheets = []
@@ -229,7 +284,7 @@ def data(b: Building, decisions: dict | None = None, run_dir: str = "") -> dict:
             if g is None:
                 continue
             props, worst = {}, "read"
-            for p in PROPS[e.type] + tuple(x for x in ("scope", "section", "top_mm", "slope") if x in e.resolved):
+            for p in PROPS[e.type] + tuple(x for x in ("scope", "section", "base_mm", "top_mm", "slope", "kind") if x in e.resolved):
                 v = e.resolved.get(p)
                 if v is None and e.type == "fold":    # not linked: as read off the drawing
                     v = e.props.get(p)
@@ -246,15 +301,51 @@ def data(b: Building, decisions: dict | None = None, run_dir: str = "") -> dict:
             out = left_out(e) or masonry
             if masonry:
                 worst = "read"          # shown, never built: nothing to decide about it
+            # lines along a beam that a section shows as its slab, or as the beam drawn again
+            # (linker._slab_strips / _section_faces): drawn as the export builds them
+            shown_as, read_note = SHOWN_AS.get(e.type, e.type), ""
+            strip, parts = e.extra.get("slab_strip"), e.extra.get("section_parts")
+            if e.type == "beam" and e.extra.get("same_beam_as"):
+                out, worst = True, "read"
+                read_note = "the same beam drawn twice - built once"
+            elif e.type == "beam" and e.extra.get("not_a_beam"):
+                out, worst = True, "read"
+                read_note = e.extra["not_a_beam"] + " - not built"
+            elif e.type == "beam" and strip:
+                from building.export import strip_outline
+                p = strip_outline(e)
+                if p:
+                    g, shown_as = {"k": "poly", "p": [[_r(x), _r(y)] for x, y in p]}, "slab"
+                    worst = "read" if strip.get("written") else "low"
+                    read_note = (f"slab strip of section {strip['section']}: {strip['width']:.0f} wide, "
+                                 f"{strip['thickness']:.0f} thick - lines read as a beam, built as slab")
+            elif e.type == "beam" and parts:
+                from building.export import beam_line, strip_outline
+                for part in parts["strips"]:
+                    p = strip_outline(e, part)
+                    if p:
+                        els.append({"id": e.id, "t": "slab", "m": "", "w": e.wing,
+                                    "lv": s.extra.get("level_key") or e.level,
+                                    "st": "read" if part.get("written") else "low", "p": {},
+                                    "g": {"k": "poly", "p": [[_r(x), _r(y)] for x, y in p]}, "ex": False, "out": False,
+                                    "var": None, "note": f"slab strip of section {parts['section']}: {part['width']:.0f} "
+                                                         f"wide, {part['thickness']:.0f} thick",
+                                    "model": support_of("slab")["model"]})
+                line = beam_line(e)
+                if line is None:
+                    continue                # only its slab: drawn above
+                g = dict(g, p=[[_r(x), _r(y)] for x, y in line], w=_r(parts["beam"]["width"]))
+                read_note = f"on its line at {parts['beam']['width']:.0f} wide, as section {parts['section']}"
             dv = e.resolved.get("depth_varies")
-            els.append({"id": e.id, "t": SHOWN_AS.get(e.type, e.type), "m": e.final("mark") or "", "w": e.wing,
+            els.append({"id": e.id, "t": shown_as, "m": e.final("mark") or "", "w": e.wing,
                         "lv": s.extra.get("level_key") or e.level, "st": worst, "p": props, "g": g,
                         "ex": bool(e.resolved.get("excluded")), "out": out,
                         "var": dv.value if dv is not None else None,
                         "note": "; ".join(x for x in (
+                            read_note,
                             ("masonry: not structure, not built" if masonry else "") or
                             ("left out of the model: " + str(e.resolved["scope"].value).split(":", 1)[-1].strip()
-                             + " ('this block' builds it)" if out else "") or
+                             + " ('this block' builds it)" if left_out(e) else "") or
                             e.extra.get("cut_before") or e.extra.get("cut_after") or
                             e.extra.get("tag_set_aside") or "",
                             ("faces drawn " + ", ".join(f"{k} {v}" for k, v in sorted(e.extra["faces"].items()))
@@ -263,6 +354,24 @@ def data(b: Building, decisions: dict | None = None, run_dir: str = "") -> dict:
                             if e.extra.get("merged_from") else "",
                             e.extra.get("legend") or "") if x),
                         "model": support_of(e.type)["model"]})
+        # the slab strip along a drawn slab edge (linker._edge_strips), as the export
+        for gi, g in enumerate(s.extra.get("section_edge_strips") or []):
+            els.append({"id": f"{sid}/edge/{gi}", "t": "slab", "m": "", "w": "",
+                        "lv": s.extra.get("level_key") or s.level, "st": "read" if g.get("written") else "low", "p": {},
+                        "g": {"k": "poly", "p": [[_r(x), _r(y)] for x, y in g["outline"]]},
+                        "ex": False, "out": False, "var": None,
+                        "note": f"slab strip of section {g['section']} along the slab edge drawn on the plan: "
+                                f"{g['width']:.0f} wide, {g['thickness']:.0f} thick", "model": support_of("slab")["model"]})
+        # beams where only their slab strips were paired (linker._beam_line_gaps), as the export
+        for gi, gb in enumerate(s.extra.get("section_gap_beams") or []):
+            els.append({"id": f"{sid}/gap/{gi}", "t": "beam", "m": str(gb["mark"]), "w": "",
+                        "lv": s.extra.get("level_key") or s.level, "st": "read", "p": {},
+                        "g": {"k": "line", "p": [[_r(gb["start"][0]), _r(gb["start"][1])],
+                                                 [_r(gb["end"][0]), _r(gb["end"][1])]], "w": _r(gb["width"])},
+                        "ex": False, "out": False, "var": None,
+                        "note": f"beam {gb['mark']}: " + (gb.get("why") or f"only its slab strips were paired here "
+                                f"(both its faces drawn); their inner edges are its faces (section {gb['section']})")
+                                + f" - {gb['width']:.0f} x {gb['depth']:.0f}", "model": support_of("beam")["model"]})
         # beams turning an L corner are drawn on to fill it (their ends are not changed)
         from building.beam_ends import corner_extensions, carried
         straight = [x for x in els if x["t"] in ("beam", "beam_span", "hidden_beam")
@@ -299,7 +408,7 @@ def data(b: Building, decisions: dict | None = None, run_dir: str = "") -> dict:
         if sc and sc.get("items"):
             d3.append(sc)
     return {"project": b.project, "store": _store(run_dir), "levels": levels, "sheets": sheets,
-            "issues": issues, "d3": d3}
+            "issues": issues, "d3": d3, "details": _details(b)}
 
 
 def _store(run_dir: str) -> str:
@@ -359,7 +468,8 @@ footer{display:flex;gap:10px;align-items:center;padding:8px 16px;border-top:1px 
 <span class="small" id="hint" style="margin-left:auto">click an element to see every source &middot; scroll to zoom &middot; drag to pan</span></header>
 <main>
 <aside><h2>Plans</h2><div class="list" id="plans"></div>
-<h2>Issues</h2><div style="padding:0 8px"><select id="cat"></select></div><div class="list" id="issues"></div></aside>
+<h2>Issues</h2><div style="padding:0 8px"><select id="cat"></select></div><div class="list" id="issues"></div>
+<h2 id="detsh" title="every section and detail in the drawings, and what was taken from it">Sections and details</h2><div class="list" id="dets"></div></aside>
 <section id="canvas"><svg id="svg"></svg><div id="gl"></div><div id="d3note"></div><div id="tip"></div></section>
 <aside id="detail"><p class="small">Select an element on the plan, or an issue on the left.</p></aside>
 </main>
@@ -477,6 +587,12 @@ $('import').onchange=ev=>{const f=ev.target.files[0];if(!f)return;f.text().then(
 $('clear').onclick=()=>{if(confirm('Clear every decision made here?')){dec={elements:{},marks:{},exclude:[],prefixes:{}};save();chips();plans();draw();issues()}};
 $('proj').textContent=(D.project||'')+(D.levels.length?' · levels '+D.levels.join(', '):'');
 save();chips();plans();issues();
+// every section and detail, and what was taken from it (read / nothing found / not read, and why)
+(function dets(){const L=D.details||[];if(!L.length){$('detsh').style.display='none';return}
+ const C={read:'var(--read)',nothing:'var(--low)',not:'#9aa3ab'};
+ $('detsh').textContent='Sections and details ('+L.length+')';
+ $('dets').innerHTML=L.map(d=>`<div class="item" style="cursor:default"><span class="dot" style="background:${C[d.st]}"></span>${esc(d.title)}`
+  +`<div class="small">${esc(d.kind)} &middot; ${esc(d.file)}</div><div class="small">${esc(d.text)}</div></div>`).join('')})();
 // ---------------------------------------------------------------- 3D view
 // The same elements, the same selection, the same decisions: a click in 3D opens
 // the element on the right; a decision recolours it in 3D at once.
@@ -519,6 +635,11 @@ function swept3(a,b,sec,z,it){const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy
  m.position.set(MM3(a[0]),MM3(z),-MM3(a[1]));return m}
 function prism3(pts,z0,z1,it){const sh=new THREE.Shape(pts.map(p=>new THREE.Vector2(MM3(p[0]),MM3(p[1]))));
  const m=mesh3(new THREE.ExtrudeGeometry(sh,{depth:Math.max(MM3(z1-z0),0.01),bevelEnabled:false}),it);m.rotation.x=-Math.PI/2;m.position.y=MM3(z0);return m}
+function lean3(m,it){m.updateMatrix();const g=m.geometry.clone();g.applyMatrix4(m.matrix);   // leaning as a wall elevation draws it
+ const p=g.attributes.position,lo=MM3(it.z0),H=Math.max(MM3(it.z1)-lo,1e-6),l=it.ln;
+ for(let i=0;i<p.count;i++){const t=Math.min(Math.max((p.getY(i)-lo)/H,0),1);
+  p.setX(i,p.getX(i)+MM3(l[0]+(l[2]-l[0])*t));p.setZ(i,p.getZ(i)-MM3(l[1]+(l[3]-l[1])*t))}
+ p.needsUpdate=true;g.computeVertexNormals();m.geometry.dispose();m.material.dispose();return mesh3(g,it)}
 function build3(i){if(grp){s3.remove(grp);grp.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
  grp=new THREE.Group();meshes=[];cur3=i;const S=D3[i];$('d3set').value=i;
  for(const it of S.items){let m=null;
@@ -527,9 +648,10 @@ function build3(i){if(grp){s3.remove(grp);grp.traverse(o=>{if(o.geometry)o.geome
   else if(it.t==='footing')m=it.p?prism3(it.p,it.z0,it.z1,it):box3(it.x,it.y,it.w,it.d,it.rot,it.z0,it.z1,it);
   else if(it.t==='beam')m=it.sec?swept3(it.a,it.b,it.sec,it.z,it):it.p?prism3(it.p,it.z-it.d,it.z,it):
    (it.z2!==undefined&&Math.abs(it.z2-it.z)>1)?slant3(it.a,it.b,it.w,it.z,it.z2,it.d,it):bar3(it.a,it.b,it.w,it.z-it.d,it.z,it);
-  else if(it.t==='wall')m=bar3(it.a,it.b,it.w,it.z0,it.z1,it);
+  else if(it.t==='wall')m=it.sec?swept3(it.a,it.b,it.sec,it.z,it):bar3(it.a,it.b,it.w,it.z0,it.z1,it);
   else if(it.t==='slab')m=it.sl?slab3(it.p,it.sl,it.z,it.th,it):prism3(it.p,it.z-it.th,it.z,it);
   else if(it.t==='stair')m=prism3(it.p,it.z0,it.z0+(it.z1-it.z0)/2,it);
+  if(m&&it.ln)m=lean3(m,it);
   if(m){grp.add(m);meshes.push(m)}}
  grp.rotation.y=-domAng(S.items.filter(it=>it.t==='beam').map(it=>[it.a,it.b]))*Math.PI/180;
  s3.add(grp);grp.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(grp),c=bb.getCenter(new THREE.Vector3());

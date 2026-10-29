@@ -76,3 +76,50 @@ C:\Users\Admin\Documents\Trabeo\Trabeo - send all the app's files here so we can
 - A .gitignore keeps clients' drawings, results read from them, office material, private notes, chat history, e-mail addresses and the sign-in files on this PC only: 793 files would go to GitHub, none of them private (checked, also for e-mail addresses and passwords).
 - The chat folder: every chat summary, and every full chat since 7 October as a readable page.
 - Make sure the repository is **Private** on GitHub before publishing from GitHub Desktop.
+
+---
+
+# Later on 26 October: everything moved to Trabeo, how testers can use it, sections and details
+From here all work is in `Documents\Trabeo\Trabeo`.
+
+## User
+Catch up on the latest update. Is my app started? Is the office part copied, are all the app's requirements in Trabeo?
+
+## Claude
+- Caught up from the notes and chats. The main app was running; the office app was not.
+- Everything the office app needs was copied, but the approved-users list was still read from the old folder, and 6 README files were missing.
+
+## User
+Copy the entire thing, don't leave one file or folder.
+
+## Claude
+- Copied every missing file (731 files, 1.1 GB incl. old runs); nothing overwritten, the old folder untouched. All 1814 files of the old folder are now in Trabeo.
+- The approved-users list is now read from and published to `Trabeo\access` (5 users; backup of the admin list first). Sign-in and office tests pass. Office app started from Trabeo.
+
+## User
+How can people outside the office test it, without depending on this PC, without paying? (Cloudflare, Google Drive, Tailscale, MonsterASP, cloud brands, downloadable app, repos.)
+
+## Claude
+- Only a computer that is on can run the app: free options are (1) an installer each tester runs on their own PC (no code readable: compiled; access by the signed list on a free web page; results stay on their PC, feedback by a shared Drive folder and a form), (2) Tailscale to reach this PC's office mode from anywhere (PC must stay on), (3) a spare office PC as the host.
+- Cloudflare / Tailscale Funnel need 3 small app changes first, one of them a security fix (visitors through a tunnel look like someone at this PC).
+- Google Drive and MonsterASP cannot run the app (storage only / .NET websites only). Paid later: Azure, AWS, Google Cloud, or Contabo/Vultr; startup credit programmes are worth applying to.
+- Repos: one private repo with everything, a releases repo with only the installer; secrets (`.c2r_admin`) never on GitHub - pen drive. Laptop: clone, copy `.c2r_admin`, develop, push; office PC pulls to update office mode.
+- Nothing decided or built yet.
+
+## User
+The app is not understanding the sections and details and building from them. It should be general. Read all details and sections, build on them, work like an engineer - without breaking anything.
+
+## Claude
+- Found two general gaps: a section drawn inside CAD blocks was taken for a scrap and never read (Winter Villa's SECTION 1 / 2); and nothing in Review said which sections were read or not.
+- Being added (on a copy first, checked on every project before it goes into the app):
+  1. Review lists every section and detail: read (what it gave, how many elements use it), read but nothing usable yet, or not read and why.
+  2. Sections and details inside blocks are read - never as a floor plan, and every other view keeps its id (saved decisions untouched).
+  3. "LEVEL -01" / "LEVEL 05" in an architect's section is the level's name, not -1 mm.
+- First comparison: 14 of 16 projects identical element by element; only Winter Villa changed (its 4 sections now read). Next readers to write, from the list: NIFT's sections A-A ... D-D, foundation sections (F-F), Pirgal's X-X / Z-Z.
+- Both apps restarted from Trabeo.
+
+## User
+Save.
+
+## Claude
+Saved this chat, SESSION_NOTES.md, the full chat in chat\full, and a backup of the app. The section/detail changes are not in the app yet - they go in once the last comparison and all 26 test groups pass.

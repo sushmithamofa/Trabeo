@@ -55,6 +55,8 @@ def merge(b: Building, stats) -> None:
     # paired across the gap by the plan reader, are not one 1070 beam)
     widths = {}
     for sec in b.of("beam_section"):
+        if sec.extra.get("drawn_as") == "lines":
+            continue                # gives only sizes (linker._sized_by_sketch), never joins beams
         set_ = b.sheets[sec.sheet].extra.get("set", "") if sec.sheet in b.sheets else ""
         try:
             widths[(set_, sec.mark)] = float(sec.get("width") or 0.0)

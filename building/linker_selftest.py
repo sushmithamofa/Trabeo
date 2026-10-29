@@ -601,6 +601,32 @@ class Outputs(unittest.TestCase):
         self.assertFalse(els[f"{P}/wall/1"]["out"])                 # an RC wall is structure: drawn as read
         self.assertFalse(els[f"{P}/beam/0"]["out"])
 
+    def test_every_section_and_detail_is_listed_with_what_was_taken_from_it(self):
+        """'Sections are not used' (user, 2026-10-26): the review lists each section and detail
+        - read (what it gave, how many elements use it), read with nothing usable found, or not
+        read and why. A sheet's lone title is not listed."""
+        from building import review
+        b = building()
+        b.add_sheet(Sheet(id="DWG:M2", file="x.dwg", kind="beam_details", title="B63 (230X600)",
+                          reader="sheets.registry"))
+        b.add_sheet(Sheet(id="DWG:M3", file="x.dwg", kind="section", title="SECTION A-A",
+                          reader="sheets.registry", extra={"view": {"entities": 40}}))
+        b.add_sheet(Sheet(id="DWG:S4", file="x.dwg", kind="stray", title="SECTION 1", reader="sheets.registry",
+                          extra={"view": {"entities": 15}, "kind": {"reasons": ["only 15 entities"]}}))
+        b.add_sheet(Sheet(id="DWG:S5", file="x.dwg", kind="stray", title="BEAM DETAILS", reader="sheets.registry",
+                          extra={"view": {"entities": 1}}))
+        b.add(Element(id="DWG:M2/spec", type="spec", sheet="DWG:M2", mark="B63",
+                      props={"depth": Value(600.0, "read", 1.0, [ev("detail", "DWG:M2")])}))
+        e = beam(b, 0, (0, 0), (6000, 0), mark="B63")
+        e.props["depth"] = Value(600.0, "read", 1.0, [ev("detail", "DWG:M2")])
+        got = {d["id"]: d for d in review.data(b)["details"]}
+        self.assertEqual(sorted(got), ["DWG:M2", "DWG:M3", "DWG:S4"])
+        self.assertEqual(got["DWG:M2"]["st"], "read")
+        self.assertIn("a source for 1 element", got["DWG:M2"]["text"])
+        self.assertEqual(got["DWG:M3"]["st"], "nothing")
+        self.assertEqual(got["DWG:S4"]["st"], "not")
+        self.assertIn("only 15 entities", got["DWG:S4"]["text"])
+
     def test_each_job_keeps_its_own_decisions_in_the_browser(self):
         """The browser kept decisions under the project name and the LENGTH of the sheet
         names, so two jobs could open each other's. Now: the job's folder and the sheets."""

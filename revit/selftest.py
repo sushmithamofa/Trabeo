@@ -17,13 +17,14 @@ WANT = ("write_placed", "delete_previous", "doc_key", "doc_id", "_is_saved", "ei
         "floor_number", "level_for_floor", "is_roof", "pick_level",
         "slab_loop_points", "set_floor_offset",
         "sunk_depths", "sunk_filter_name", "footing_size_key", "column_size_groups",
-        "section_points", "slope_z_mm")
+        "section_points", "slope_z_mm", "profile_points", "level_at", "earlier_records", "drawing_levels",
+        "wall_bases", "_concrete_first", "lean_points", "slant_angle")
 # module-level constants the lifted functions rely on. These are taken from the
 # file too, never supplied by the test: a test that hands in its own ROT_OFFSET
 # passes happily while the shipped one is wrong, which is exactly the bug the
 # rotation tests exist to catch.
 WANT_CONSTS = ("ROT_OFFSET", "REMOVED", "FLOOR_WORDS", "ROOF_WORDS", "LEVEL_USED",
-               "LEGACY_OTHER")
+               "LEGACY_OTHER", "NOT_A_SHEAR_WALL", "NOT_CAST_CONCRETE")
 
 
 def load_funcs(ns):
@@ -566,6 +567,91 @@ class TestDrawnSection(unittest.TestCase):
         north = ns["section_points"](prof, (0.0, 0.0), (0.0, 5000.0))       # running north: left is west
         self.assertAlmostEqual(north[3][0], -375.0)
         self.assertAlmostEqual(north[3][2], 0.0)
+
+
+class TestShearWallType(unittest.TestCase):
+    """The template's 'Wall-Fnd_300Con_Footing' had been given to every 300 mm shear wall."""
+
+    def test_a_shear_wall_type_is_made_from_a_concrete_wall_never_a_footing_first(self):
+        ns = load_funcs({"os": os, "json": json})
+        names =["Wall-Fnd_300Con_Footing", "Generic - 200mm", "Wall-Ext_102Bwk-75Ins-100LBlk", "Wall-Int_RCC 230"]
+        got = ns["wall_bases"](names)
+        self.assertEqual(got[:2], ["Wall-Int_RCC 230", "Generic - 200mm"])
+        self.assertEqual(set(got[2:]), {"Wall-Fnd_300Con_Footing", "Wall-Ext_102Bwk-75Ins-100LBlk"})
+
+
+class TestConcreteMaterial(unittest.TestCase):
+    """Winter Villa's template: 'Concrete Masonry Units' gave the shear walls a block pattern."""
+
+    def test_cast_in_place_concrete_first_masonry_last(self):
+        ns = load_funcs({"os": os, "json": json})
+        names = ["Concrete Masonry Units _High Density", "Concrete, Precast", "Generic", "Concrete, Cast-in-Place gray",
+                 "Wood - Sheathing"]
+        got = ns["_concrete_first"](names, lambda n: n)
+        self.assertEqual(got[0], "Concrete, Cast-in-Place gray")
+        self.assertEqual(got[1], "Generic")
+        self.assertEqual(set(got[2:]), {"Concrete Masonry Units _High Density", "Concrete, Precast", "Wood - Sheathing"})
+
+
+class TestEarlierRuns(unittest.TestCase):
+    """Each Analyse makes a new run folder: a floor's previous build is recorded in another one."""
+
+    def test_this_floors_records_from_the_other_runs_newest_first(self):
+        ns = load_funcs({"os": os, "json": json})
+        root = tempfile.mkdtemp()
+        try:
+            def rec(run, floor):
+                d = os.path.join(root, "runs", run, "revit_build", floor)
+                os.makedirs(d)
+                p = os.path.join(d, "placed.json")
+                io.open(p, "w").write(u"{}")
+                return p
+            old, mine, other_floor = rec("2026-10-28_1300", "M8_plan"), rec("2026-10-28_1400", "M8_plan"),                 rec("2026-10-28_1200", "M6_plan")
+            newer = rec("2026-10-28_1430", "M8_plan")
+            got = ns["earlier_records"](mine)
+            self.assertEqual([os.path.normcase(p) for p in got], [os.path.normcase(newer), os.path.normcase(old)])
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_a_floor_builds_on_the_level_at_its_height_when_none_has_its_name(self):
+        ns = load_funcs({"os": os, "json": json})
+        entries = [{"revit_name": "Service Floor", "elevation_mm": 0.0, "status": "override"},
+                   {"revit_name": "Ground floor", "elevation_mm": 2800.0, "status": "override"}]
+        self.assertEqual(ns["level_at"]("Service Floor", entries, {"Level 0": 0.0, "Ground floor": 2800.0}), "Level 0")
+        self.assertIsNone(ns["level_at"]("Service Floor", entries, {"Ground floor": 0.0}))
+
+
+class TestProfileWall(unittest.TestCase):
+    """A wall built to the shape its elevation draws (SW15 leaning): [along, up] laid from the
+    origin along dir, up from the level below."""
+
+    def test_the_profile_is_laid_along_the_wall(self):
+        ns = load_funcs({"os": os, "json": json})
+        prof = {"origin": [1000.0, 2000.0], "dir": [0.0, 1.0], "thickness": 300.0,
+                "points": [[0, 0], [1250, 0], [1500, 3900], [250, 3900]]}
+        got = ns["profile_points"](prof)
+        self.assertEqual(got[0], (1000.0, 2000.0, 0.0))
+        self.assertEqual(got[2], (1000.0, 3500.0, 3900.0))
+
+
+class TestLean(unittest.TestCase):
+    """C12 and SW13 leaning as SHEAR WALL ELEVATION (SW15 , SA14 , SW13 ,C12 ) draws them."""
+
+    def test_a_columns_ends_move_by_its_base_and_top(self):
+        ns = load_funcs({"os": os, "json": json})
+        ln = {"base": [100.0, 0.0], "top": [400.0, -500.0]}
+        a, b = ns["lean_points"]((0.0, 0.0, 10.0), (0.0, 0.0, 0.0), ln, 1.0)      # Revit's top end first
+        self.assertEqual((a, b), ((400.0, -500.0, 10.0), (100.0, 0.0, 0.0)))
+
+    def test_a_wall_slants_by_its_lean_across_it(self):
+        import math
+        ns = load_funcs({"os": os, "json": json})
+        ang, along = ns["slant_angle"]({"base": [0.0, 0.0], "top": [0.0, -390.0]}, (0.0, -1.0), 3900.0)
+        self.assertAlmostEqual(ang, math.atan2(390.0, 3900.0))
+        self.assertAlmostEqual(along, 0.0)
+        ang, along = ns["slant_angle"]({"base": [0.0, 0.0], "top": [100.0, 390.0]}, (0.0, -1.0), 3900.0)
+        self.assertLess(ang, 0.0)
+        self.assertAlmostEqual(along, 100.0)
 
 
 class TestSlopingSlab(unittest.TestCase):

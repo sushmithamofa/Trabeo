@@ -376,6 +376,45 @@ class LayerSizes(unittest.TestCase):
         self.assertEqual(b2.of("section_cut")[0].mark, "X")
         del hung
 
+    def nift_section(self, words="FLOOR BEAM"):
+        """NIFT SECTION A-A: drawn with loose lines at 4x, the beam hanging under the slab with
+        no line across its top; real dimensions (DIMLFAC 0.25) on the slab only."""
+        from building.sheets.source import texts_in
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        lay = {"layer": "RCE-BEAM"}
+        for a, c in (((600, -2500), (600, -600)), ((0, -600), (0, 0)), ((0, 0), (5500, 0)), ((600, -2500), (1800, -2500)),
+                     ((1800, -600), (1800, -2500)), ((0, -600), (600, -600)), ((1800, -600), (5500, -600))):
+            msp.add_line(a, c, dxfattribs=lay)
+        ov = {"dimlfac": 0.25}
+        msp.add_linear_dim(base=(-300, -300), p1=(0, -600), p2=(0, 0), angle=90, override=ov,
+                           dxfattribs={"layer": "RCE-DIM-C"}).render()
+        msp.add_linear_dim(base=(300, -900), p1=(600, -600), p2=(0, -600), angle=0, override=ov,
+                           dxfattribs={"layer": "RCE-DIM-C"}).render()
+        msp.add_text(words, height=225, dxfattribs={"insert": (2900, -1900), "layer": "RCE-TEXT"})
+        msp.add_text("SECTION A-A", height=500, dxfattribs={"insert": (-400, -3800), "layer": "RCE-TITLE"})
+        return doc, rec("section", texts_in(msp, "model"), doc=doc, handles=[e.dxf.handle for e in msp])
+
+    def test_a_section_drawn_with_loose_lines_is_read_and_added_last(self):
+        from building.readers import beam_sections
+        doc, r = self.nift_section()
+        b = Building()
+        self.assertEqual(beam_sections.read(b, r), 1)
+        self.assertEqual(b.of("beam_section"), [])             # not yet: no other element's id may move
+        self.assertEqual(beam_sections.add_late(b), 1)
+        s = b.of("beam_section")[0]
+        # 1200 x 2500 drawn at the dimensions' scale 0.25; its own sizes are not written
+        self.assertEqual((s.mark, s.get("width"), s.get("depth")), ("A", 300.0, 625.0))
+        self.assertEqual((s.extra["drawn_as"], s.extra["rectangle"], s.extra["full_width"]), ("lines", True, 300.0))
+        self.assertEqual(s.extra["undimensioned"], ["across", "up"])
+
+    def test_a_wall_section_drawn_with_lines_is_not_a_beam(self):
+        from building.readers import beam_sections
+        _, r = self.nift_section(words="RET.WALL")
+        b = Building()
+        self.assertEqual(beam_sections.read(b, r), 0)
+        self.assertEqual(beam_sections.add_late(b), 0)
+
     def test_dashed_or_solid_is_read_from_the_line_pattern(self):
         """HIDDEN is dashed; CONTINOUS (sic) and '1' are solid whatever they are called."""
         from building.readers import linework

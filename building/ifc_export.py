@@ -228,6 +228,17 @@ class _Model:
         return w.add("IFCEXTRUDEDAREASOLID(%s,%s,%s,%s)" % (
             prof, w.axis((0.0, 0.0, z0)), w.dir(0.0, 0.0, 1.0), _f(height)))
 
+    def leaned(self, outline, z0: float, height: float, base, top) -> str:
+        """An outline in plan leaning as a wall elevation draws it: its bottom moved across by
+        base, its top by top (mm) - extruded on the slant between them."""
+        w = self.w
+        dx, dy = float(top[0]) - float(base[0]), float(top[1]) - float(base[1])
+        L = math.sqrt(dx * dx + dy * dy + height * height)
+        prof = w.add("IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,%s)" % self._polyline(
+            [(p[0] + float(base[0]), p[1] + float(base[1])) for p in outline]))
+        return w.add("IFCEXTRUDEDAREASOLID(%s,%s,%s,%s)" % (
+            prof, w.axis((0.0, 0.0, z0)), w.dir(dx / L, dy / L, height / L), _f(L)))
+
     def bar(self, a, b, width: float, depth: float, z_top: float) -> str:
         """A rectangular section width x depth along a to b, its top at z_top."""
         w = self.w
@@ -454,6 +465,8 @@ def write(run: str, path: str, decisions: dict | None = None, log=print, name: s
                 z0, z1 = (z, elev[other]) if fl else (elev[other], z)
             if not fl and c.get("top_mm"):
                 z1 += float(c["top_mm"])                     # ends under a lowered beam (building section)
+            if not fl and c.get("base_mm") and other is not None:
+                z0 += float(c["base_mm"])                    # starts higher (wall elevation: on a raft above)
             if z1 - z0 <= 1.0:
                 left.append(f"column {c.get('mark') or '?'} ({lvl}): no height between its levels")
                 continue
@@ -468,7 +481,9 @@ def write(run: str, path: str, decisions: dict | None = None, log=print, name: s
                 corners = [(-d_ / 2, -w_ / 2), (d_ / 2, -w_ / 2), (d_ / 2, w_ / 2), (-d_ / 2, w_ / 2)]
                 outline = [(c["x"] + u * ex - v * ey, c["y"] + u * ey + v * ex) for u, v in corners]
             pts = [(p[0] - ox, p[1] - oy) for p in outline]
-            m.element("IFCCOLUMN", lvl, [m.prism(pts, z0 - z, z1 - z0)], c.get("mark") or "", ".COLUMN.",
+            ln = c.get("lean") if not fl else None           # leaning as a wall elevation draws it
+            solid = m.leaned(pts, z0 - z, z1 - z0, ln["base"], ln["top"]) if ln else m.prism(pts, z0 - z, z1 - z0)
+            m.element("IFCCOLUMN", lvl, [solid], c.get("mark") or "", ".COLUMN.",
                       why(c, note) or ("floating column" if fl else ""),
                       size_key=column_label(c["width"], c["depth"]) if c.get("width") and c.get("depth") else "")
             made["columns"] += 1
@@ -565,6 +580,13 @@ def write(run: str, path: str, decisions: dict | None = None, log=print, name: s
                 left.append(f"wall {wl.get('mark') or '?'} ({lvl}): no height between its levels")
                 continue
             solids = []
+            pf = wl.get("profile") if below is not None else None
+            if pf:
+                # the shape a wall elevation draws (an arch, a lean): its profile across its thickness
+                (px, py), (ux, uy), t = pf["origin"], pf["dir"], float(pf["thickness"])
+                nx, ny = uy * t / 2, -ux * t / 2
+                solids.append(m.swept((px - nx - ox, py - ny - oy), (px + nx - ox, py + ny - oy), pf["points"], -h))
+                runs = []
             for a, e, t in runs:
                 a2, e2 = (a[0] - ox, a[1] - oy), (e[0] - ox, e[1] - oy)
                 L = math.dist(a2, e2)
@@ -574,7 +596,12 @@ def write(run: str, path: str, decisions: dict | None = None, log=print, name: s
                 nx, ny = -uy * t / 2, ux * t / 2
                 rect = [(a2[0] + nx, a2[1] + ny), (e2[0] + nx, e2[1] + ny), (e2[0] - nx, e2[1] - ny),
                         (a2[0] - nx, a2[1] - ny)]
-                solids.append(m.prism(rect, -h, h))
+                b0 = float(wl.get("base_mm") or 0.0) if below is not None else 0.0
+                t0 = float(wl.get("top_mm") or 0.0) if below is not None else 0.0
+                # a wall elevation's base / top off the levels (linker._wall_heights)
+                ln = wl.get("lean") if below is not None else None
+                solids.append(m.leaned(rect, -h + b0, h - b0 + t0, ln["base"], ln["top"]) if ln else
+                              m.prism(rect, -h + b0, h - b0 + t0))
             if solids:
                 m.element("IFCWALL", lvl, solids, wl.get("mark") or "", ".SOLIDWALL.",
                           why(wl, "" if below is not None else

@@ -11,9 +11,10 @@ import ast, io, os, unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "build_extras.py")
-WANT = ("bottom_in_model", "footing_boxes", "raft_slabs", "plan_levels", "type_name", "pedestal_box", "stair_runs")
+WANT = ("bottom_in_model", "footing_boxes", "raft_slabs", "plan_levels", "type_name", "pedestal_box", "stair_runs",
+        "level_at")
 LIFTED = ("collect", "levels", "neighbour_level", "_setp", "set_floor_offset", "set_comment", "set_mark",
-          "_concrete_first", "concrete_material", "_single_layer", "_is_single_layer",
+          "_concrete_first", "NOT_CAST_CONCRETE", "concrete_material", "_single_layer", "_is_single_layer",
           "floor_type_for", "slab_loop_points", "set_size", "base_symbol", "collect_same_family",
           "activate", "TypeCache", "SIZE_PARAMS",
           "eid", "BEAM_COLOURS", "_solid_fill_id", "_equals_rule", "_filter_views",
@@ -95,6 +96,16 @@ class Plan(unittest.TestCase):
         self.assertEqual(moved[1], ("move", "Level 1", (3000.0, 3150.0)))
         made = F["plan_levels"]([{"revit_name": "Level 3", "elevation_mm": 9450, "status": "read"}], existing)
         self.assertEqual(made, [("create", "Level 3", 9450.0)])
+
+    def test_a_floor_with_no_level_of_its_name_hangs_from_the_level_at_its_height(self):
+        """Winter Villa: 'Service Floor' at +0, the model's +0 level left from earlier named 'Level 0'."""
+        entries = [{"revit_name": "Service Floor", "elevation_mm": 0.0, "status": "override"},
+                   {"revit_name": "Ground floor", "elevation_mm": 2800.0, "status": "override"}]
+        self.assertEqual(F["level_at"]("Service Floor", entries, {"Level 0": 0.0, "Ground floor": 2800.0}), "Level 0")
+        # never another floor of the drawings, never one of two at that height, never an unknown height
+        self.assertIsNone(F["level_at"]("Service Floor", entries, {"Ground floor": 0.4}))
+        self.assertIsNone(F["level_at"]("Service Floor", entries, {"Level 0": 0.0, "Base": 0.5}))
+        self.assertIsNone(F["level_at"]("Basement", entries, {"Level 0": 0.0}))
 
     def test_a_pedestal_stands_on_its_footing_and_its_step(self):
         items = [{"type": "footing", "mark": "F7", "x": 0, "y": 0, "size_x": 3600, "size_y": 3900, "thickness": 450,

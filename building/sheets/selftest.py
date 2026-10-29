@@ -8,6 +8,8 @@ tools\sheets_baseline.py, which takes a few minutes.
 """
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 
 import ezdxf
@@ -359,6 +361,41 @@ class Views(unittest.TestCase):
         msp.add_blockref("NORTH", (50000, 50000))
         views = find_views(doc)
         self.assertEqual(sorted(v.source for v in views), ["model region", "model region", "stray"])
+
+    def test_section_kept_in_blocks_is_read_as_a_section_and_ids_stay(self):
+        """Winter Villa's "SECTION 1": a few texts and inserts on top, ~800 entities in its
+        blocks - read, under the id it had as a scrap, and only ever as a section. A small
+        block with a section-looking text, and a scrap with no such title, stay scraps."""
+        from building.sheets.registry import register
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        for i in range(40):                                           # a floor, drawn loose
+            msp.add_line((i * 500, 0), (i * 500, 8000), dxfattribs={"layer": "BEAM"})
+        cut = doc.blocks.new("SEC1")
+        for i in range(60):
+            cut.add_line((0, i * 100), (9000, i * 100))
+        msp.add_blockref("SEC1", (100000, 0))
+        msp.add_text("SECTION 1", height=300, dxfattribs={"insert": (100000, -1000)})
+        logo = doc.blocks.new("LOGO")
+        for i in range(60):
+            logo.add_line((0, 0), (300, i * 5))
+        msp.add_blockref("LOGO", (200000, 0))                         # a big block, no title
+        tiny = doc.blocks.new("TINY")
+        for i in range(3):
+            tiny.add_line((0, 0), (300, i * 50))
+        msp.add_blockref("TINY", (300000, 0))
+        msp.add_text("SECTION 2", height=300, dxfattribs={"insert": (300000, -1000)})
+        before = {v.id: v.source for v in find_views(doc)}
+        held = [v for v in find_views(doc) if v.inside_blocks]
+        self.assertEqual(len(held), 1)
+        self.assertTrue(held[0].id.startswith("S"))                  # the id it had as a scrap
+        self.assertEqual(sorted(before.values()), ["model region", "model region", "stray", "stray"])
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "sections.dxf")
+            doc.saveas(p)
+            recs = {r.view.id: r for r in register(p, d)}
+        self.assertEqual(recs[held[0].id].verdict.kind, "section")
+        self.assertEqual(sorted(r.view.id for r in recs.values()), sorted(before))
 
     @staticmethod
     def _plan_with_sections(section_layer="S-BEAM", schedule=False):

@@ -25,3 +25,6 @@ Every Claude Code session on this app, oldest first. Times are UTC (India: add 5
 - [2026-10-22_688f7bd4.md](2026-10-22_688f7bd4.md) - 48 messages
 - [2026-10-22_73723dfa.md](2026-10-22_73723dfa.md) - 124 messages
 - [2026-10-23_bf66e917.md](2026-10-23_bf66e917.md) - 368 messages
+- [2026-10-26_8d1f6e94.md](2026-10-26_8d1f6e94.md) - 105 messages
+- [2026-10-27_3a67bbb2.md](2026-10-27_3a67bbb2.md) - 201 messages
+- [2026-10-28_f6c01007.md](2026-10-28_f6c01007.md) - 330 messages

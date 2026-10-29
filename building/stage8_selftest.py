@@ -86,6 +86,17 @@ class Export(unittest.TestCase):
         self.assertEqual([(c["mark"], c["depth"]) for c in out["columns"]], [("C1", 600.0), ("C2", 750.0)])
         self.assertEqual(rep.held, [])
 
+    def test_a_column_the_schedule_starts_here_is_written_as_rising_from_this_level(self):
+        """C9 'FF TO SF' on the 1st floor plan: written as a floating column, which the Revit
+        build, the IFC and the 3D view all raise from this level to the next."""
+        b, _ = plan(columns=[col("C1", 0, 0, 300.0, 600.0), col("C9", 5000, 0, 300.0, 600.0)])
+        spec(b, "C1", 300.0, 600.0, {"table": "column schedule", "level_range": ["GF", "L1"]})
+        spec(b, "C9", 300.0, 600.0, {"table": "column schedule", "level_range": ["L1", "L2"]})
+        link(b)
+        out, rep = export_plan(b, SID)
+        self.assertEqual([(c["mark"], c["kind"]) for c in out["columns"]], [("C1", "column"), ("C9", "column_float")])
+        self.assertTrue(any("C9" in c and "kind column -> column_float" in c for c in rep.changed), rep.changed)
+
     def test_a_size_of_zero_or_below_is_never_built(self):
         """A column decided -230 wide was exported at -230: held as needing a decision, and
         built at a working size (marked) only when unsettled elements are built."""
@@ -117,6 +128,252 @@ class Export(unittest.TestCase):
         link(b, {"marks": {"B7": {"depth": 600}}})
         out, _ = export_plan(b, SID)
         self.assertEqual(out["beams"][0]["depth"], 600.0)
+
+    def test_a_section_drawn_with_lines_sizes_only_the_beams_nothing_else_sizes(self):
+        """NIFT SECTION A-A (300 x 625, only the slab dimensioned) cut across three beams:
+        the one with no depth is built at 625, open until decided; 2B5 keeps its detail's
+        600; a 150 wide line is not that beam. Never a shape: they stay Revit beams."""
+        from building import Sheet
+
+        def bm(mark, x, w, depth):
+            return {"mark": mark, "kind": "beam", "start": [x, -3000.0], "end": [x, 3000.0], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x:.0f}"}
+        b, _ = plan(beams=[bm("", 0.0, 300.0, None), bm("2B5", 2000.0, 300.0, 600.0), bm("", 4000.0, 150.0, None)])
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={"set": "P"}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="section", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("beam_sections", "P:D")]
+        b.add(Element(id="P:D/beam_section/L9", type="beam_section", sheet="P:D", mark="A",
+                      props={"width": Value(300.0, "read", 1.0, ev), "depth": Value(625.0, "read", 1.0, ev)},
+                      extra={"profile": [[0, -625], [0, 0], [300, 0], [300, -625]], "title": "SECTION A-A",
+                             "undimensioned": ["across", "up"], "hung": [], "drawn_as": "lines", "scale": 0.25,
+                             "full_width": 300.0, "rectangle": True}))
+        b.add(Element(id="P:V/section_cut/0", type="section_cut", sheet="P:V", mark="A",
+                      geometry={"a": [-500.0, 0.0], "b": [4500.0, 0.0]}, props={"name": Value("A", "read", 0.9, ev)}))
+        link(b)
+        got = {(e.final("mark"), e.get("width")): e.resolved["depth"] for e in b.of("beam")}
+        self.assertEqual((got[(None, 300.0)].value, got[(None, 300.0)].status), (625.0, "missing"))
+        self.assertEqual((got[("2B5", 300.0)].value, got[("2B5", 300.0)].status), (600.0, "read"))
+        self.assertIsNone(got[(None, 150.0)].value)
+        self.assertTrue(all("section" not in e.resolved and not e.extra.get("section_profile") for e in b.of("beam")))
+        out, rep = export_plan(b, SID)                       # strict: the measured depth is not settled
+        self.assertEqual(sorted(r["mark"] for r in out["beams"]), ["2B5"])
+        out, rep = export_plan(b, SID, provisional=True)
+        row = next(r for r in out["beams"] if r["width"] == 300.0 and not r["mark"])
+        self.assertEqual(row["depth"], 625.0)
+        self.assertIn("section A-A", row["provisional"])
+        self.assertNotIn("section", row)
+        # decided in the review: that stands
+        link(b, {"elements": {next(e.id for e in b.of("beam") if not e.mark and e.get("width") == 300.0): {"depth": 600}}})
+        self.assertEqual(next(e.final("depth") for e in b.of("beam") if not e.mark and e.get("width") == 300.0), 600)
+
+    def test_the_slab_a_section_draws_beside_its_beam_is_built_as_slab_not_beams(self):
+        """NIFT 5th floor SECTION A-A: 5B2 300 x 600, the 150 slab running 150 past its outer
+        face and 300 past its inner one. On the plan: a line pair 150 wide outside (read as a
+        150 'beam') and one line 450 inside (the slab's edge, read as a beam with no width) -
+        built as two slab strips, not as beams; 5B2 itself as it was."""
+        from building import Sheet
+
+        def bm(mark, y, w, depth, note=""):
+            return {"mark": mark, "kind": "beam", "start": [0.0, y], "end": [10000.0, y], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{y:.0f}", "notes": [note] if note else []}
+        b, _ = plan(beams=[bm("5B2", 0.0, 300.0, 600.0), bm("", -225.0, 150.0, None),
+                           bm("", 450.0, None, None, "drawn as a plain line: centreline assumed, width from schedule")])
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={"set": "P"}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="section", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("beam_sections", "P:D")]
+        b.add(Element(id="P:D/beam_section/L9", type="beam_section", sheet="P:D", mark="A",
+                      props={"width": Value(300.0, "read", 1.0, ev), "depth": Value(600.0, "read", 1.0, ev)},
+                      extra={"profile": [[0, -600], [0, 0], [300, 0], [300, -600]], "title": "SECTION A-A",
+                             "undimensioned": ["across", "up"], "hung": [], "drawn_as": "lines", "scale": 0.25,
+                             "full_width": 300.0, "rectangle": True, "slab_thickness": {"mm": 150.0, "written": True},
+                             "flanges": [{"side": "left", "width": 150.0, "closed": True, "written": True},
+                                         {"side": "right", "width": 300.0, "closed": True, "written": True}]}))
+        b.add(Element(id="P:V/section_cut/0", type="section_cut", sheet="P:V", mark="A",
+                      geometry={"a": [5000.0, -600.0], "b": [5000.0, 800.0]}, props={"name": Value("A", "read", 0.9, ev)}))
+        link(b)
+        out, rep = export_plan(b, SID, provisional=True)
+        self.assertEqual([(r["mark"], r["width"], r["depth"]) for r in out["beams"]], [("5B2", 300.0, 600.0)])
+        strips = sorted((min(p[1] for p in r["outline"]), max(p[1] for p in r["outline"]), r["thickness"])
+                        for r in out["slabs"])
+        self.assertEqual([tuple(round(v) for v in s) for s in strips], [(-300, -150, 150), (150, 450, 150)])
+        self.assertTrue(all("provisional" not in r for r in out["slabs"]))
+
+    def test_pairs_of_lines_along_a_beam_are_read_as_the_section_draws_them(self):
+        """NIFT 5th floor top edge: lines at -450, -150, +150, +300 from 5B2's centre (SECTION A-A:
+        300 beam, slab 300 in and 150 out). The plan reader's pairs: the beam (A, 5B2); a span with
+        no mark between two 5B2 (B); 450 wide captioned 5B2 = the beam + its outer strip (C); the
+        beam again inside C's stretch (D); 600 wide = the beam + its inner strip (E)."""
+        from building import Sheet
+
+        def bm(mark, x0, x1, y, w, depth):
+            return {"mark": mark, "kind": "beam", "start": [x0, y], "end": [x1, y], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x0:.0f}{w:.0f}", "notes": []}
+        b, _ = plan(beams=[bm("5B2", 0.0, 5000.0, 0.0, 300.0, 600.0), bm("", 5000.0, 10000.0, 0.0, 300.0, None),
+                           bm("5B2", 10000.0, 20000.0, 75.0, 450.0, None), bm("", 12000.0, 16000.0, 0.0, 300.0, None),
+                           bm("", 10000.0, 20000.0, -150.0, 600.0, None)])
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={"set": "P"}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="section", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("beam_sections", "P:D")]
+        b.add(Element(id="S/spec/5B2", type="spec", sheet="P:D", mark="5B2",
+                      props={"family": Value("beam", "read", 1.0, ev), "width": Value(300.0, "read", 0.95, ev),
+                             "depth": Value(600.0, "read", 0.95, ev)}, extra={"raw": "5B2"}))
+        b.add(Element(id="P:D/beam_section/L9", type="beam_section", sheet="P:D", mark="A",
+                      props={"width": Value(300.0, "read", 1.0, ev), "depth": Value(600.0, "read", 1.0, ev)},
+                      extra={"profile": [[0, -600], [0, 0], [300, 0], [300, -600]], "title": "SECTION A-A",
+                             "undimensioned": ["across", "up"], "hung": [], "drawn_as": "lines", "scale": 0.25,
+                             "full_width": 300.0, "rectangle": True, "slab_thickness": {"mm": 150.0, "written": True},
+                             "flanges": [{"side": "left", "width": 150.0, "closed": True, "written": True},
+                                         {"side": "right", "width": 300.0, "closed": True, "written": True}]}))
+        b.add(Element(id="P:V/section_cut/0", type="section_cut", sheet="P:V", mark="A",
+                      geometry={"a": [2000.0, -800.0], "b": [2000.0, 800.0]}, props={"name": Value("A", "read", 0.9, ev)}))
+        link(b)
+        out, rep = export_plan(b, SID)
+        beams = sorted((r["start"][0], round(r["start"][1]), r["mark"], r["width"], r["depth"]) for r in out["beams"])
+        self.assertEqual(beams, [(0.0, 0, "5B2", 300.0, 600.0), (5000.0, 0, "5B2", 300.0, 600.0),
+                                 (10000.0, 0, "5B2", 300.0, 600.0)])
+        strips = sorted((round(min(p[1] for p in r["outline"])), round(max(p[1] for p in r["outline"])), r["thickness"])
+                        for r in out["slabs"])
+        self.assertEqual(strips, [(-450, -150, 150.0), (150, 300, 150.0)])
+        self.assertTrue(any("drawn twice" in x for x in rep.left_out), rep.left_out)
+
+    def test_the_beam_is_built_where_only_its_slab_strips_were_paired(self):
+        """NIFT 5th floor Y12-Y13: all four lines drawn, but the reader paired each beam face with
+        the slab edge beside it - two strips, no beam - between two 5B2 spans. The strips' inner
+        edges are the beam's faces: 5B2 is built there. A break the width of a column is not."""
+        from building import Sheet
+
+        def bm(mark, x0, x1, y, w, depth):
+            return {"mark": mark, "kind": "beam", "start": [x0, y], "end": [x1, y], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x0:.0f}{y:.0f}", "notes": []}
+        b, _ = plan(beams=[bm("5B2", 0.0, 5000.0, 0.0, 300.0, 600.0), bm("5B2", 10000.0, 15000.0, 0.0, 300.0, 600.0),
+                           bm("5B2", 15300.0, 20000.0, 0.0, 300.0, 600.0),
+                           bm("", 0.0, 15000.0, 225.0, 150.0, None), bm("", 0.0, 15000.0, -300.0, 300.0, None)])
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={"set": "P"}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="section", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("beam_sections", "P:D")]
+        b.add(Element(id="P:D/beam_section/L9", type="beam_section", sheet="P:D", mark="A",
+                      props={"width": Value(300.0, "read", 1.0, ev), "depth": Value(600.0, "read", 1.0, ev)},
+                      extra={"profile": [[0, -600], [0, 0], [300, 0], [300, -600]], "title": "SECTION A-A",
+                             "undimensioned": ["across", "up"], "hung": [], "drawn_as": "lines", "scale": 0.25,
+                             "full_width": 300.0, "rectangle": True, "slab_thickness": {"mm": 150.0, "written": True},
+                             "flanges": [{"side": "left", "width": 150.0, "closed": True, "written": True},
+                                         {"side": "right", "width": 300.0, "closed": True, "written": True}]}))
+        b.add(Element(id="P:V/section_cut/0", type="section_cut", sheet="P:V", mark="A",
+                      geometry={"a": [2000.0, -800.0], "b": [2000.0, 800.0]}, props={"name": Value("A", "read", 0.9, ev)}))
+        link(b)
+        out, rep = export_plan(b, SID)
+        beams = sorted((round(r["start"][0]), round(r["end"][0]), r["mark"], r["width"], r["depth"]) for r in out["beams"])
+        self.assertEqual(beams, [(0, 5000, "5B2", 300.0, 600.0), (5000, 10000, "5B2", 300.0, 600.0),
+                                 (10000, 15000, "5B2", 300.0, 600.0), (15300, 20000, "5B2", 300.0, 600.0)])
+        self.assertEqual(len(out["slabs"]), 2)
+
+    def test_an_end_beam_drawn_only_as_its_slab_strips_with_its_mark_on_the_strip(self):
+        """NIFT 5th floor Y23, X1-X2: '5B4A' written on the outer strip (150), the inner strip drawn
+        300 wide, no pair for the beam; the cut crosses only the strips. 5B4A stands on from X2 to
+        X3. The beam is built X1-X2 on its line (both strips line it), the strips as slab; a 300
+        mm single line wholly along the column at X1 is part of the column, not a beam."""
+        from building import Sheet
+
+        def bm(mark, x0, x1, y, w, depth, note=""):
+            return {"mark": mark, "kind": "beam", "start": [x0, y], "end": [x1, y], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x0:.0f}{y:.0f}", "notes": [note] if note else []}
+        column = dict(col("", -150.0, 0.0, 300.0, 900.0), outline=[[-300, -450], [0, -450], [0, 450], [-300, 450]])
+        b, _ = plan(columns=[column],
+                    beams=[bm("5B4A", 5000.0, 10000.0, 0.0, 300.0, 600.0), bm("5B4A", 0.0, 6000.0, 225.0, 150.0, 600.0),
+                           bm("", 0.0, 6000.0, -300.0, 300.0, None),
+                           bm("", -100.0, -100.0, 0.0, None, None)])
+        b.elements[-1].geometry.update(start=[100.0, 550.0], end=[100.0, 250.0])
+        b.elements[-1].notes.append("drawn as a plain line: centreline assumed, width from schedule")
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={"set": "P"}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="section", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("beam_sections", "P:D")]
+        b.add(Element(id="P:D/beam_section/L9", type="beam_section", sheet="P:D", mark="A",
+                      props={"width": Value(300.0, "read", 1.0, ev), "depth": Value(600.0, "read", 1.0, ev)},
+                      extra={"profile": [[0, -600], [0, 0], [300, 0], [300, -600]], "title": "SECTION A-A",
+                             "undimensioned": ["across", "up"], "hung": [], "drawn_as": "lines", "scale": 0.25,
+                             "full_width": 300.0, "rectangle": True, "slab_thickness": {"mm": 150.0, "written": True},
+                             "flanges": [{"side": "left", "width": 150.0, "closed": True, "written": True},
+                                         {"side": "right", "width": 300.0, "closed": True, "written": True}]}))
+        b.add(Element(id="P:V/section_cut/0", type="section_cut", sheet="P:V", mark="A",
+                      geometry={"a": [3000.0, -800.0], "b": [3000.0, 800.0]}, props={"name": Value("A", "read", 0.9, ev)}))
+        link(b)
+        out, rep = export_plan(b, SID)
+        beams = sorted((round(r["start"][0]), round(r["end"][0]), round(r["start"][1]), r["mark"], r["width"])
+                       for r in out["beams"])
+        self.assertEqual(beams, [(0, 5000, 0, "5B4A", 300.0), (5000, 10000, 0, "5B4A", 300.0)])
+        strips = sorted((round(min(p[1] for p in r["outline"])), round(max(p[1] for p in r["outline"]))) for r in out["slabs"])
+        self.assertEqual(strips, [(-450, -150), (150, 300)])
+        self.assertTrue(any("part of how the column is drawn" in x for x in rep.left_out), rep.left_out)
+
+    def test_a_beam_runs_as_far_as_both_its_faces_are_drawn(self):
+        """NIFT 4th floor, 4B2 by the stair: both faces drawn 0-4850, the reader's pair stopped at
+        2811. Carried on to 4850 at its own size; a beam whose faces stop where it stops, or one
+        with only one face drawn further, is left as it is."""
+        from building import Sheet
+
+        def bm(mark, x0, x1, y, w, depth):
+            return {"mark": mark, "kind": "beam", "start": [x0, y], "end": [x1, y], "width": w,
+                    "width_source": "measured", "depth": depth, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x0:.0f}{y:.0f}", "notes": []}
+        b, _ = plan(beams=[bm("4B2", 150.0, 2811.0, 0.0, 300.0, 600.0), bm("4B3", 150.0, 2811.0, 5000.0, 300.0, 600.0)])
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        lines = [[0, 150.0, 150.0, 4850.0, 150.0, 1], [0, 150.0, -150.0, 4850.0, -150.0, 1],      # 4B2: both faces on
+                 [0, 150.0, 5150.0, 4850.0, 5150.0, 0], [0, 150.0, 4850.0, 2811.0, 4850.0, 0]]  # 4B3: one face only
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry",
+                          extra={"set": "P", "beam_lines": {"layers": ["BEAM"], "lines": lines}}))
+        link(b)
+        out, rep = export_plan(b, SID)
+        beams = sorted((r["mark"], round(r["start"][0]), round(r["end"][0]), r["width"], r["depth"]) for r in out["beams"])
+        self.assertEqual(beams, [("4B2", 150, 2811, 300.0, 600.0), ("4B2", 2811, 4850, 300.0, 600.0),
+                                 ("4B3", 150, 2811, 300.0, 600.0)])
+
+    def test_a_beam_detail_running_over_grids_marks_the_unmarked_spans_between(self):
+        """NIFT: 4B2 written once on the plan; its detail runs from grid Y1 to Y3, over a
+        column. The other span between Y1 and Y3 is 4B2 (size from its detail); a span past
+        Y3, or one not as wide, is not. Y3 is shown only by its label: it runs through it,
+        as Y1 and Y2 (drawn) run."""
+        from building import Sheet
+
+        def bm(mark, x0, x1, w=300.0):
+            return {"mark": mark, "kind": "beam", "start": [x0, 0.0], "end": [x1, 0.0], "width": w,
+                    "width_source": "measured", "depth": None, "depth_source": "", "top_mm": 0.0,
+                    "source_layer": "BEAM", "handle": f"h{x0:.0f}{w:.0f}"}
+        cols = [dict(col(f"C{n}", x, 0.0, 300.0, 300.0), outline=[[x - 150, -150], [x + 150, -150], [x + 150, 150],
+                                                                    [x - 150, 150]])
+                for n, x in enumerate((0.0, 5000.0, 10000.0, 15000.0))]
+        b, _ = plan(columns=cols,
+                    beams=[bm("4B2", 0.0, 5000.0), bm("", 5000.0, 10000.0), bm("", 10000.0, 15000.0),
+                           bm("", 5000.0, 10000.0, 150.0)])
+        b.sheets[SID].grids = [{"label": "", "start": [x, -3000.0], "end": [x, 3000.0], "handle": f"g{x:.0f}"}
+                               for x in (0.0, 5000.0)]
+        b.sheets[SID].extra["view_sheet"] = "P:V"
+        b.add_sheet(Sheet(id="P:V", file="p.dwg", kind="framing_plan", reader="sheets.registry", extra={
+            "set": "P", "grid_labels": [["(A)Y1", 0.0, 3600.0, 250.0], ["(A)Y2", 5000.0, 3600.0, 250.0],
+                                        ["(A)Y3", 10000.0, 3600.0, 250.0]]}))
+        b.add_sheet(Sheet(id="P:D", file="p.dwg", kind="beam_details", reader="sheets.registry", extra={"set": "P"}))
+        ev = [Evidence("labels", "P:D")]
+        b.add(Element(id="P:D/spec/0", type="spec", sheet="P:D", mark="4B2",
+                      props={"family": Value("beam", "read", 1.0, ev), "width": Value(300.0, "read", 0.95, ev),
+                             "depth": Value(600.0, "read", 0.95, ev)},
+                      extra={"raw": "4B2", "grid_span": ["(A)Y1", "(A)Y2", "(A)Y3"]}))
+        link(b)
+        got = {(e.geometry["start"][0], e.get("width")): (e.final("mark"), e.final("depth")) for e in b.of("beam")}
+        self.assertEqual(got[(5000.0, 300.0)], ("4B2", 600.0))
+        self.assertEqual(got[(10000.0, 300.0)][0], None)            # past Y3: not that beam
+        self.assertEqual(got[(5000.0, 150.0)][0], None)             # not as wide
+        b.of("beam")[1].mark = "B9"                                  # a mark of its own wins
+        link(b)
+        self.assertEqual(b.of("beam")[1].final("mark"), "B9")
 
     def test_built_anyway_unsettled_goes_out_at_a_working_size_with_its_reason(self):
         """The app's default: B7 (no depth anywhere) is built at the depth most beams as
@@ -883,6 +1140,42 @@ class BeamCorners(unittest.TestCase):
         # three ends at one joint: not an L
         three = corner_extensions([((0, 0), (5000, 0), 230), ((0, 0), (0, 4000), 230), ((0, 0), (-3000, 0), 230)])
         self.assertEqual(three, [[0.0, 0.0]] * 3)
+
+
+
+class BeamsOntoSupports(unittest.TestCase):
+    """Winter Villa: beams stopping 50-260 mm short of the angled walls that carry them."""
+
+    def test_a_beam_stopping_short_is_carried_onto_its_wall(self):
+        from shapely.geometry import box
+        from building.beam_ends import onto_supports
+        got = onto_supports([((0.0, 0.0), (1000.0, 0.0), 300.0)], [box(1060, -200, 1360, 200)])
+        self.assertEqual(got, [[None, [1210.0, 0.0], None]])        # to the middle of its bearing
+
+    def test_a_curved_beam_is_carried_on_round_its_arc(self):
+        import math
+        from shapely.geometry import box
+        from building.beam_ends import onto_supports
+        a, m, b = (5000.0, 0.0), (5000 * math.cos(math.pi / 4), 5000 * math.sin(math.pi / 4)), (0.0, 5000.0)
+        (s0, e, mid), = onto_supports([(a, b, 300.0, m)], [box(-400, 4800, -100, 5200)])
+        self.assertIsNone(s0)
+        self.assertAlmostEqual(math.hypot(*e[:2]), 5000.0, places=3)
+        self.assertAlmostEqual(math.hypot(*mid[:2]), 5000.0, places=3)
+        self.assertTrue(-400 < e[0] < -100)
+
+    def test_beams_in_line_and_free_ends_stay_as_drawn(self):
+        from building.beam_ends import onto_supports
+        # two spans of one line, a column's width apart: not carried into each other
+        self.assertEqual(onto_supports([((0.0, 0.0), (5000.0, 0.0), 300.0), ((5300.0, 0.0), (9000.0, 0.0), 300.0)], []),
+                         [[None, None, None], [None, None, None]])
+        # nothing ahead within reach: a free end
+        self.assertEqual(onto_supports([((0.0, 0.0), (1000.0, 0.0), 300.0)], []), [[None, None, None]])
+
+    def test_a_beam_lands_on_the_beam_across_its_end(self):
+        from building.beam_ends import onto_supports
+        got = onto_supports([((0.0, 0.0), (1000.0, 0.0), 230.0), ((1250.0, -2000.0), (1250.0, 2000.0), 300.0)], [])
+        self.assertEqual(got[0][1], [1250.0, 0.0])                   # 100 short: onto its centre line
+        self.assertEqual(got[1], [None, None, None])
 
 
 if __name__ == "__main__":

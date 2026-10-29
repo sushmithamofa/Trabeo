@@ -977,6 +977,16 @@
   "title": "SECTION CC'",
   "wing": "MAIN"
  },
+ "entry stair details 13_03_2025.dwg S3": {
+  "entities": 26,
+  "kind": "stair_details",
+  "level_conflict": false,
+  "levels": [],
+  "same_as": "",
+  "source": "unplaced region",
+  "title": "entry stair details 13_03_2025",
+  "wing": ""
+ },
  "entry stair details 13_03_2025.dwg U1": {
   "entities": 723,
   "kind": "framing_plan",

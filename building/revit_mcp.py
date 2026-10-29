@@ -507,7 +507,7 @@ def level_targets(run, decisions=None):
     unless the level already stands in the user's own model."""
     rir = _rir()
     floors = rir.exported_floors(run)
-    known = {}
+    known, spelt = {}, {}
     lj = os.path.join(run, "revit_build", "levels.json")
     if os.path.exists(lj):
         with io.open(lj, encoding="utf-8") as f:
@@ -515,15 +515,25 @@ def level_targets(run, decisions=None):
                 if e.get("status") in ("read", "override") and e.get("elevation_mm") is not None:
                     known[(e.get("revit_name") or "").strip().upper()] = (
                         float(e["elevation_mm"]), "decided" if e.get("status") == "override" else "drawings")
+                    spelt.setdefault((e.get("revit_name") or "").strip().upper(), (e.get("revit_name") or "").strip())
     for n, v in ((decisions or {}).get("levels") or {}).items():
         if v not in (None, ""):
             known[str(n).strip().upper()] = (float(v), "decided")
+            spelt[str(n).strip().upper()] = str(n).strip()
     names = []
     for _, _, lvl in floors:                    # bottom floor first (exported_floors' order)
         if lvl and lvl not in names:
             names.append(lvl)
     if names:
         below = below_name(names[0])
+        # the nearest decided level below the lowest floor (Foundation -1200 under the Service
+        # Floor), as the 3D view and the Revit build take it - not a leftover 'Below ...' lower down
+        z0 = known.get(names[0].strip().upper(), (None, ""))[0]
+        floor_names = {n.strip().upper() for n in names}
+        under = [(z, k) for k, (z, src) in known.items() if z0 is not None and src == "decided"
+                 and z < z0 - 1.0 and k and k not in floor_names]
+        if under:
+            below = spelt.get(max(under)[1], below)
         if below.upper() not in {n.upper() for n in names}:
             names.insert(0, below)
     return [(n,) + known.get(n.strip().upper(), (None, "")) for n in names]

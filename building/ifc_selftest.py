@@ -242,6 +242,22 @@ class RhinoExport(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.run, ignore_errors=True)
 
+    def test_a_leaning_wall_is_a_closed_solid_facing_out(self):
+        """SW13 leaning as its wall elevation draws it: a wall's rectangle comes clockwise - its
+        faces must still point out, or Rhino shows it hollow (user 2026-10-28)."""
+        from building.rhino_export import RhinoModel
+        m = RhinoModel.__new__(RhinoModel)
+        for rect in ([(0, 150), (1200, 150), (1200, -150), (0, -150)], [(0, -150), (1200, -150), (1200, 150), (0, 150)]):
+            _k, v, faces, _size = m.leaned(rect, 0.0, 3900.0, (0.0, 0.0), (0.0, 400.0))
+            vol = 0.0
+            for f in faces:
+                a = v[f[0]]
+                for i in range(1, len(f) - 1):
+                    b, c = v[f[i]], v[f[i + 1]]
+                    vol += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                            + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6.0
+            self.assertAlmostEqual(vol, 1200 * 300 * 3900, delta=1.0)        # positive: faces outward
+
     def test_the_ifc_elements_on_layers_coloured_like_the_revit_filters(self):
         import rhino3dm
         from building import rhino_export
@@ -251,16 +267,19 @@ class RhinoExport(unittest.TestCase):
         layers = {ly.FullPath: tuple(ly.Color)[:3] for ly in m.Layers}
         pal = rhino_export.beam_colours()
         # sorted as the Revit build sorts its filters: 230x450 first, then 230x600
-        self.assertEqual(layers["GF::Beams::Beam 230x450"], pal[0])
-        self.assertEqual(layers["GF::Beams::Beam 230x600"], pal[1])
+        # by element, not by floor (user 2026-10-28); the floor is each object's Level
+        self.assertEqual(layers["Beams::Beam 230x450"], pal[0])
+        self.assertEqual(layers["Beams::Beam 230x600"], pal[1])
+        self.assertFalse(any(k.startswith("GF") for k in layers))
         objs = list(m.Objects)
         self.assertTrue(all(o.Geometry.IsValid for o in objs))
         b3 = next(o for o in objs if o.Attributes.Name == "B3")
         self.assertEqual(tuple(b3.Attributes.ObjectColor)[:3], rhino_export.RED)
         self.assertIn("depth not given", b3.Attributes.GetUserString("Note"))
+        self.assertEqual(b3.Attributes.GetUserString("Level"), "GF")
         # a column and a sunk slab by size too, in the next colours after the beams'
-        self.assertEqual(layers["GF::Columns::Column 300x600"], pal[2])
-        self.assertEqual(layers["GF::Slabs::Sunk slab 100 mm"], pal[3])
+        self.assertEqual(layers["Columns::Column 300x600"], pal[2])
+        self.assertEqual(layers["Slabs::Sunk slab 100 mm"], pal[3])
         s1 = next(o for o in objs if o.Attributes.Name == "S1")
         self.assertEqual(s1.Geometry.ProfileCount, 2)                 # its opening
         self.assertEqual(m.Settings.ModelUnitSystem, rhino3dm.UnitSystem.Millimeters)

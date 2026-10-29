@@ -482,6 +482,79 @@ class ColumnSchedule(unittest.TestCase):
         link(b)
         self.assertIsNone(cols[-1].final("mark"))
 
+    def extent(self, rows, plans, x_above=0.0):
+        """A schedule (mark -> [range]) and plans (level key -> [marks]), linked."""
+        b = Building()
+        b.add_sheet(Sheet(id="CS", file="x", reader="sheets.registry", extra={"set": "P"}))
+        for mark, rngs in rows.items():
+            for rng in rngs:
+                ev = [Evidence("column_schedule", "CS")]
+                b.add(Element(id=f"CS/spec/{mark}{rng[0]}", type="spec", sheet="CS", mark=mark,
+                              props={"family": Value("column", "read", 1.0, ev), "width": Value(600, "read", 0.85, ev),
+                                     "depth": Value(300, "read", 0.85, ev)},
+                              extra={"table": "column schedule", "level_range": list(rng)}))
+        cols = {}
+        for n, (key, marks) in enumerate(plans.items()):
+            sid = f"P:{key}/plan"
+            b.add_sheet(Sheet(id=sid, file="p", reader="plan.legacy", extra={"set": "P", "level_key": key}))
+            for i, m in enumerate(marks):
+                cols[(key, m)] = b.add(Element(id=f"{sid}/column/{i}", type="column", sheet=sid, mark=m,
+                                               geometry={"x": 5000.0 * i + (x_above if n else 0.0), "y": 0.0}))
+        return b, cols
+
+    def ext_issues(self, b):
+        return [i for i in b.issues if i.category == "column extent"]
+
+    def test_columns_the_schedule_agrees_with_are_left_as_they_are(self):
+        b, cols = self.extent({"C2": [("FDN", "GF"), ("GF", "L1")]}, {"GF": ["C2"], "L1": ["C2"]})
+        link(b)
+        self.assertEqual([c.final("kind") for c in cols.values()], [None, None])
+        self.assertEqual(self.ext_issues(b), [])
+
+    def test_a_column_the_schedule_starts_at_this_floor_is_built_upward(self):
+        """C9 'FF TO SF' on the 1st floor plan: it sits on this floor, like a floating column."""
+        b, cols = self.extent({"C9": [("L1", "L2")], "C2": [("FDN", "GF"), ("GF", "L1")]}, {"L1": ["C2", "C9"]})
+        link(b)
+        self.assertEqual(cols[("L1", "C9")].resolved["kind"].value, "column_float")
+        self.assertNotIn("kind", cols[("L1", "C2")].resolved)
+        self.assertEqual([(i.severity, i.mark) for i in self.ext_issues(b)], [("info", "C9")])
+        # decided otherwise in the review: that stands
+        link(b, {"elements": {cols[("L1", "C9")].id: {"kind": "column"}}})
+        self.assertEqual(cols[("L1", "C9")].final("kind"), "column")
+
+    def test_drawn_where_it_starts_and_on_the_plan_above_it_is_built_once(self):
+        """C9 drawn on the 1st floor plan (where it starts) and on the 2nd (under its slab):
+        the 2nd floor plan builds it; the 1st floor one is not made to rise as well."""
+        b, cols = self.extent({"C9": [("L1", "L2")]}, {"L1": ["C9"], "L2": ["C9"]}, x_above=40.0)
+        link(b)
+        self.assertNotIn("kind", cols[("L1", "C9")].resolved)
+        self.assertEqual([(i.severity, i.mark) for i in self.ext_issues(b)], [("warning", "C9")])
+        self.assertIn("exclude it in the review", self.ext_issues(b)[0].message)
+
+    def test_a_column_the_schedule_has_not_at_this_floor_is_reported(self):
+        b, cols = self.extent({"C1": [("FDN", "GF")]}, {"GF": ["C1"], "L1": ["C1"]})
+        link(b)
+        got = self.ext_issues(b)
+        self.assertEqual([(i.severity, i.mark, i.sheet) for i in got], [("warning", "C1", "P:L1/plan")])
+        self.assertNotIn("kind", cols[("L1", "C1")].resolved)
+
+    def test_columns_running_on_above_the_highest_plan_are_reported(self):
+        """C1 runs to ROOF in the schedule; only GF and L1 plans imported: nothing above L1 is built."""
+        b, _ = self.extent({"C1": [("FDN", "GF"), ("GF", "L1"), ("L1", "ROOF")], "C3": [("FDN", "GF"), ("GF", "L1")]},
+                           {"GF": ["C1", "C3"], "L1": ["C1", "C3"]})
+        link(b)
+        got = self.ext_issues(b)
+        self.assertEqual([(i.severity, i.sheet) for i in got], [("warning", "P:L1/plan")])
+        self.assertIn("C1 (to ROOF)", got[0].message)
+        self.assertNotIn("C3", got[0].message)
+
+    def test_a_section_drawn_without_dimensions_still_says_the_column_is_there(self):
+        b, cols = self.extent({}, {"L1": ["C9"]})
+        b.sheets["CS"].extra["column_schedule"] = [{"mark": "C9", "range": ["L1", "L2"], "size": "drawn, not dimensioned"},
+                                                   {"mark": "C9", "range": ["GF", "L1"], "size": None}]
+        link(b)
+        self.assertEqual(cols[("L1", "C9")].resolved["kind"].value, "column_float")
+
     def test_floor_abbreviations_before_a_floor_word(self):
         self.assertEqual(levels_in("FF SLAB LVL"), ["L1"])
         self.assertEqual(levels_in("rev SF lvl slab"), ["L2"])

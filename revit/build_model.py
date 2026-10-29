@@ -679,61 +679,114 @@ def wall_runs(outline, t_min=100.0, t_max=600.0):
     return [(r[0], r[1], r[2]) for r in runs]
 
 
+NOT_A_SHEAR_WALL = ("FND", "FOUND", "FOOTING", "RETAIN", "BRICK", "MASONRY", "CMU", "BLOCK", "STUD",
+                    "PARTITION", "CURTAIN", "GLAZ", "PARAPET", "SOFFIT", "INSUL", "CLAD")
+
+
+def wall_bases(names):
+    """Wall types to make an RCC shear wall type from, best first: concrete ones, then
+    generic, never first a footing, retaining or masonry type ('Wall-Fnd_300Con_Footing'
+    had been given to every 300 mm shear wall, which Revit then showed as a foundation
+    wall). Plain arithmetic on names, so it is tested without Revit."""
+    def rank(n):
+        u = (n or "").upper()
+        bad = any(w in u for w in NOT_A_SHEAR_WALL)
+        conc = "RCC" in u or "CONCRETE" in u or "CONC" in u
+        return (1 if bad else 0, 0 if conc else 1 if "GENERIC" in u else 2)
+    return sorted(names, key=rank)
+
+
 def wall_type_for(thickness_mm, cache):
-    """A basic wall type exactly this thick, duplicated from one that exists."""
+    """An RCC shear wall type exactly this thick: one concrete layer, nothing else.
+
+    Named "RCC Shear Wall 300 mm" and so on, reused if already in the model (repaired if it
+    is not one layer that thick), else made from the best base (wall_bases). A footing or
+    retaining type of the same thickness is never taken as it is; a base whose function
+    is foundation / retaining / soffit is set to an ordinary wall in the new type.
+    """
     key = int(round(thickness_mm))
     if key in cache:
         return cache[key]
     from Autodesk.Revit.DB import WallKind
+    name = "RCC Shear Wall %d mm" % key
     basic = []
     for wt in collect(BuiltInCategory.OST_Walls):
         try:
-            if wt.Kind != WallKind.Basic:
-                continue
+            if wt.Kind == WallKind.Basic:
+                basic.append(wt)
         except Exception:
             continue
-        basic.append(wt)
-        if abs(wt.Width - MM(thickness_mm)) < MM(2.0):
-            cache[key] = wt
-            return wt
-    for wt in basic:
+    concrete = concrete_material()
+    existing = next((wt for wt in basic if wt.Name == name), None)
+    if existing is not None:
+        if not _is_single_layer(existing, thickness_mm, concrete) and                 not _single_layer(existing, thickness_mm, concrete) and not _is_single_layer(existing, thickness_mm):
+            say("WARNING  Wall type '%s' is not %d mm thick and could not be corrected. Set its "
+                "structure in Edit Type." % (name, key))
+        cache[key] = existing
+        return existing
+    by_name = dict((wt.Name, wt) for wt in basic)
+    errors = []
+    for n in wall_bases(list(by_name)):
+        new = None
         try:
-            cs = wt.GetCompoundStructure()
-            if cs is None or cs.LayerCount != 1:
-                continue
-            name = "RCC %d mm" % key
-            new = wt.Duplicate(name)
-            cs = new.GetCompoundStructure()
-            cs.SetLayerWidth(0, MM(thickness_mm))
-            new.SetCompoundStructure(cs)
-            cache[key] = new
-            return new
-        except Exception:
-            continue
-    cache[key] = basic[0] if basic else None
+            new = by_name[n].Duplicate(name)
+            if _single_layer(new, thickness_mm, concrete):
+                try:
+                    p = new.get_Parameter(BuiltInParameter.FUNCTION_PARAM)
+                    if p is not None and not p.IsReadOnly and p.AsInteger() in (2, 3, 4):
+                        p.Set(1)           # foundation / retaining / soffit -> an ordinary (exterior) wall
+                except Exception:
+                    pass
+                if concrete is None:
+                    say("NOTE     No material named concrete in this model; '%s' took its material "
+                        "from '%s'. Check it in Edit Type." % (name, n))
+                cache[key] = new
+                return new
+            errors.append("%s: structure not accepted" % n)
+        except Exception as ex:
+            errors.append("%s: %s" % (n, str(ex).splitlines()[0]))
+        if new is not None:            # leave no half-made type behind with the name
+            try:
+                doc.Delete(new.Id)
+            except Exception:
+                pass
+    fallback = wall_bases(list(by_name))
+    cache[key] = by_name[fallback[0]] if fallback else None
+    say("WARNING  Could not make the wall type '%s'; its walls were given '%s' instead. Change "
+        "their type by hand. %s" % (name, fallback[0] if fallback else "nothing", "; ".join(errors[:3])))
     return cache[key]
 
 
+NOT_CAST_CONCRETE = ("MASONRY", "CMU", "BLOCK", "BRICK", "PRECAST", "PAVER", "TILE")
+
+
 def _concrete_first(items, name_of):
-    """Concrete-looking names first: duplicating 'Floor_Timber_22Cbd-225Joist'
-    gave the RCC slabs a timber material in their project."""
+    """Concrete-looking names first, cast-in-place / RCC before any other concrete:
+    duplicating 'Floor_Timber_22Cbd-225Joist' gave the RCC slabs a timber material in
+    their project, and 'Concrete Masonry Units' gave the shear walls a block pattern in
+    Winter Villa's. Masonry, block and precast go last with timber and steel."""
     def rank(x):
         try:
             n = (name_of(x) or "").upper()
         except Exception:
             n = ""
-        if "RCC" in n or "CONCRETE" in n or "CONC" in n:
+        if any(w in n for w in NOT_CAST_CONCRETE):
+            return 4
+        if "RCC" in n or ("CAST" in n and "CONC" in n):
             return 0
-        if "GENERIC" in n:
+        if "CONCRETE" in n or "CONC" in n:
             return 1
+        if "GENERIC" in n:
+            return 2
         if any(w in n for w in ("TIMBER", "WOOD", "JOIST", "STEEL", "METAL", "DECK")):
-            return 3
-        return 2
+            return 4
+        return 3
     return sorted(items, key=rank)
 
 
 def concrete_material():
-    """A material called concrete in this model, or None."""
+    """A material called concrete in this model - cast-in-place first, never a masonry /
+    block / precast one ('Concrete Masonry Units') - or None."""
     try:
         from Autodesk.Revit.DB import Material
         mats = list(FilteredElementCollector(doc).OfClass(Material).ToElements())
@@ -741,7 +794,7 @@ def concrete_material():
         return None
     for m in _concrete_first(mats, lambda m: m.Name):
         n = (m.Name or "").upper()
-        if "CONCRETE" in n or "RCC" in n:
+        if ("CONCRETE" in n or "RCC" in n) and not any(w in n for w in NOT_CAST_CONCRETE):
             return m.Id
     return None
 
@@ -927,6 +980,33 @@ def is_roof(text):
     return any(w in t for w in ROOF_WORDS)
 
 
+def drawing_levels():
+    """levels.json of the export (the folder above this floor's), or []."""
+    try:
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(MODEL_JSON))), "levels.json")
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def level_at(name, entries, existing):
+    """The model level standing where the drawings' level `name` stands, when the model has
+    none of that name: the only level within 1 mm of its elevation, and not itself another
+    of the drawings' levels (that one is its own floor). None otherwise. Plain arithmetic,
+    so it is tested without Revit."""
+    mine = [e for e in entries if (e.get("revit_name") or "").strip().lower() == str(name).strip().lower()
+            and e.get("elevation_mm") is not None and e.get("status") in ("read", "override")]
+    if len(mine) != 1:
+        return None
+    z = float(mine[0]["elevation_mm"])
+    named = set((e.get("revit_name") or "").strip().lower() for e in entries)
+    at = [n for n, v in existing.items() if abs(float(v) - z) <= 1.0]
+    if len(at) != 1 or at[0].strip().lower() in named:
+        return None
+    return at[0]
+
+
 def pick_level(name, drawing=None):
     """The level the BEAMS of this plan sit on.
 
@@ -942,6 +1022,12 @@ def pick_level(name, drawing=None):
         for l in all_levels:
             if l.Name.strip().lower() == str(name).strip().lower():
                 return l
+        entries = drawing_levels()
+        stand = level_at(name, entries, dict((l.Name, l.Elevation * 304.8) for l in all_levels)) if entries else None
+        if stand:
+            say("No level in this model is named '%s'; '%s' stands at its height, so this floor is "
+                "built on it. Rename it '%s' in Revit if you like." % (name, stand, name))
+            return next(l for l in all_levels if l.Name == stand)
         say("No level in this model is named '%s'. The levels here are: %s. Rename one "
             "in Revit, or type the right name in the extractor's Revit level box (or "
             "LEVEL_NAME at the top of this file), and run again."
@@ -2021,6 +2107,98 @@ def shaped_beam(prof, p1, p2, start, end):
     return ds
 
 
+def profile_points(prof):
+    """A wall's drawn shape (export: wall "profile") as points in the drawing, mm: (x, y, z)
+    with z up from the level below - each [along, up] laid from the origin along dir.
+    Plain arithmetic, so it is tested without Revit."""
+    (x0, y0), (ux, uy) = prof["origin"][:2], prof["dir"][:2]
+    return [(x0 + ux * float(a), y0 + uy * float(a), float(z)) for a, z in prof["points"]]
+
+
+def profile_wall(pts, wt, level):
+    """A structural wall whose outline in its own plane is the closed loop pts (XYZ): an arch
+    cut out of its foot, a lean. Raises if Revit refuses it; the caller builds it straight."""
+    from Autodesk.Revit.DB import Curve
+    from System.Collections.Generic import List as _L
+    curves = _L[Curve]()
+    for i in range(len(pts)):
+        a, c = pts[i], pts[(i + 1) % len(pts)]
+        if a.DistanceTo(c) > MM(1.0):
+            curves.Add(Line.CreateBound(a, c))
+    return Wall.Create(doc, curves, wt.Id, level.Id, True)
+
+
+def lean_points(a, b, ln, per_mm):
+    """A leaning column's two ends (export: "lean", linker._section_lean): its lower end moved
+    across by ln "base", its upper by ln "top" (mm; per_mm: model units per mm). a, b: (x, y, z)
+    as Revit has them, either way round; returned in the same order. Plain arithmetic, so it
+    is tested without Revit."""
+    lo_first = a[2] <= b[2]
+    (bx, by), (tx, ty) = ln["base"][:2], ln["top"][:2]
+    lo, hi = (a, b) if lo_first else (b, a)
+    lo = (lo[0] + bx * per_mm, lo[1] + by * per_mm, lo[2])
+    hi = (hi[0] + tx * per_mm, hi[1] + ty * per_mm, hi[2])
+    return (lo, hi) if lo_first else (hi, lo)
+
+
+def slant_angle(ln, orient, height_mm):
+    """A leaning wall's slant (radians from vertical) and how much of its lean is along it, not
+    across (mm): Revit slants a wall only across itself. orient: the wall's (x, y) facing."""
+    import math
+    dx = float(ln["top"][0]) - float(ln["base"][0])
+    dy = float(ln["top"][1]) - float(ln["base"][1])
+    across = dx * orient[0] + dy * orient[1]
+    along = abs(-dx * orient[1] + dy * orient[0])
+    return math.atan2(across, float(height_mm)), along
+
+
+def lean_column(inst, ln, mark):
+    """A column leaning as a wall elevation draws it: made end-point driven (slanted), its ends
+    moved across. False, said, when Revit refuses it: it stays upright."""
+    try:
+        _setp(inst, BuiltInParameter.SLANTED_COLUMN_TYPE_PARAM, 2)       # end point driven
+        doc.Regenerate()
+        crv = inst.Location.Curve
+        p0, p1 = crv.GetEndPoint(0), crv.GetEndPoint(1)
+        a, b = lean_points((p0.X, p0.Y, p0.Z), (p1.X, p1.Y, p1.Z), ln, MM(1.0))
+        inst.Location.Curve = Line.CreateBound(XYZ(*a), XYZ(*b))
+        return True
+    except Exception as exc:
+        say("column %s: could not lean it as the wall elevation draws (%s) - built upright" % (mark or "?", exc))
+        return False
+
+
+def lean_wall(wall, ln, height_mm, mark):
+    """A wall leaning across itself as a wall elevation draws it (its base line already moved by
+    ln "base"): slanted, Revit 2021 and later. Which way Revit tilts a positive angle is read
+    back from the wall's box. False, said, when it cannot: it stays upright."""
+    try:
+        from Autodesk.Revit.DB import WallCrossSection
+        o = wall.Orientation
+        ang, along = slant_angle(ln, (o.X, o.Y), height_mm)
+        if abs(ang) < 1e-4:
+            return True
+        bb0 = wall.get_BoundingBox(None)
+        c0 = (bb0.Min + bb0.Max) * 0.5
+        wall.CrossSection = WallCrossSection.Slanted
+        _setp(wall, BuiltInParameter.WALL_SINGLE_SLANT_ANGLE_FROM_VERTICAL, abs(ang))
+        doc.Regenerate()
+        bb1 = wall.get_BoundingBox(None)
+        c1 = (bb1.Min + bb1.Max) * 0.5
+        moved = (c1.X - c0.X) * o.X + (c1.Y - c0.Y) * o.Y
+        if abs(moved) < MM(1.0):
+            raise Exception("Revit left it upright")
+        if moved * ang < 0:
+            _setp(wall, BuiltInParameter.WALL_SINGLE_SLANT_ANGLE_FROM_VERTICAL, -abs(ang))
+        if along > 50.0:
+            say("wall %s: its lean along itself (%.0f mm) is not built - Revit slants a wall only "
+                "across itself" % (mark or "?", along))
+        return True
+    except Exception as exc:
+        say("wall %s: could not slant it as the wall elevation draws (%s) - built upright" % (mark or "?", exc))
+        return False
+
+
 def mark_provisional(el, label, note, pt=None):
     set_comment(el, PROVISIONAL_TAG + note)
     PROVISIONAL.append((el.Id, label, note, pt))
@@ -2258,6 +2436,69 @@ def _belongs_to_floor(el, level, fc_marks):
     return is_col and mark in fc_marks and level.Elevation < mid <= hi
 
 
+def earlier_records(placed_file):
+    """placed.json of this floor from the project's earlier runs - runs/<time>/revit_build/
+    <floor>/placed.json beside this run's - newest first. Each Analyse makes a new run folder,
+    so the previous build of this floor is often recorded in another one."""
+    import glob as _glob
+    here = os.path.dirname(os.path.abspath(placed_file))
+    runs = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    me = os.path.normcase(os.path.abspath(placed_file))
+    found = _glob.glob(os.path.join(runs, "*", "revit_build", os.path.basename(here), "placed.json"))
+    return sorted((p for p in found if os.path.normcase(os.path.abspath(p)) != me), reverse=True)
+
+
+def delete_earlier_runs():
+    """Take out what earlier runs of this project placed for this floor IN THIS VERY MODEL
+    (their record's model fingerprint, doc_id, is this model's): left in, they stood where
+    this build's elements go, so this build skipped those places and the model kept the old
+    ones. Records from any other model, or with no fingerprint, are left alone."""
+    me = doc_id()
+    if not me:
+        return 0
+    ours = set()
+    for bic in ("OST_StructuralColumns", "OST_StructuralFraming", "OST_Walls", "OST_Floors", "OST_TextNotes"):
+        try:
+            ours.add(int(getattr(BuiltInCategory, bic)))
+        except Exception:
+            pass
+    ids, runs = [], 0
+    for path in earlier_records(PLACED_FILE):
+        try:
+            with open(path, "r") as f:
+                rec = json.load(f)
+        except Exception:
+            continue
+        if rec.get("doc_id") != me or rec.get("uids") is None:
+            continue
+        n0 = len(ids)
+        for u in rec["uids"]:
+            try:
+                el = doc.GetElement(str(u))
+            except Exception:
+                el = None
+            if el is None:
+                continue
+            try:
+                cid = el.Category.Id
+                cnum = int(cid.Value) if hasattr(cid, "Value") else int(cid.IntegerValue)
+            except Exception:
+                continue
+            if cnum in ours and el.Id not in ids:
+                ids.append(el.Id)
+        runs += 1 if len(ids) > n0 else 0
+    if not ids:
+        return 0
+    from System.Collections.Generic import List as _List
+    coll = _List[ElementId]()
+    for i in ids:
+        coll.Add(i)
+    doc.Delete(coll)
+    say("mode=\"replace\": also took out %d elements that %d earlier run(s) of this project built for this "
+        "floor in this model - they would have kept this build from placing its own." % (len(ids), runs))
+    return len(ids)
+
+
 def delete_previous(level=None, fc_marks=()):
     """Remove the elements a previous run of this script placed. Returns a count.
 
@@ -2484,6 +2725,7 @@ def build():
     elif MODE == "replace":
         delete_previous(level, [norm(c.get("mark")) for c in data.get("columns", [])
                                 if is_floating(c)])
+        delete_earlier_runs()
 
     calibrated = [False]
     made = {"columns": 0, "beams": 0, "folds": 0, "walls": 0, "floors": 0}
@@ -2602,6 +2844,12 @@ def build():
                     _setp(inst, BuiltInParameter.FAMILY_TOP_LEVEL_OFFSET_PARAM, MM(float(c["top_mm"])))
                 except Exception as exc:
                     say("column %s: could not lower its top (%s)" % (c.get("mark") or "?", exc))
+            if c.get("base_mm") and not floating(c) and neighbour_level(level, -1) is not None:
+                # starts above the level below (a wall elevation: it stands on a raft higher up)
+                try:
+                    _setp(inst, BuiltInParameter.FAMILY_BASE_LEVEL_OFFSET_PARAM, MM(float(c["base_mm"])))
+                except Exception as exc:
+                    say("column %s: could not raise its base (%s)" % (c.get("mark") or "?", exc))
             rot = float(c.get("rotation") or 0.0)
             turn = column_rotation_deg(rot)
             axis = Line.CreateBound(pt, XYZ(pt.X, pt.Y, pt.Z + 1.0))
@@ -2614,6 +2862,9 @@ def build():
                     # the offset was wrong: put this one right, the rest follow
                     ElementTransformUtils.RotateElement(
                         doc, inst.Id, axis, 90.0 * 3.14159265358979 / 180.0)
+            if c.get("lean") and not floating(c) and neighbour_level(level, -1) is not None:
+                # leaning as a wall elevation draws it (C12 beside SW13 - SW15)
+                lean_column(inst, c["lean"], c.get("mark"))
             set_mark(inst, c.get("mark"))
             if col_note:
                 mark_provisional(inst, "column %s" % (c.get("mark") or "?"), col_note, pt)
@@ -2761,6 +3012,20 @@ def build():
         if strict and w.get("start") and w.get("end") and not w.get("thickness"):
             held.append("wall %s: no thickness given" % (w.get("mark") or ""))
             continue
+        if w.get("profile") and below is not None and wall_type is not None:
+            # the shape a wall elevation draws (an arch, a lean): one profile wall
+            try:
+                wt = wall_type_for(w["profile"]["thickness"], wall_types)
+                pts = [XYZ(MM(x - ox), MM(y - oy), below.Elevation + MM(z)) for x, y, z in profile_points(w["profile"])]
+                wall = profile_wall(pts, wt, below)
+                set_mark(wall, w.get("mark"))
+                if wall_note:
+                    mark_provisional(wall, "wall %s" % (w.get("mark") or ""), wall_note, pts[0])
+                remember(wall)
+                made["walls"] += 1
+                continue
+            except Exception as exc:
+                say("wall %s: its drawn shape could not be built (%s) - built straight" % (w.get("mark") or "?", exc))
         if w.get("start") and w.get("end"):
             runs = [(w["start"], w["end"], w.get("thickness") or 230.0)]
         elif w.get("outline"):
@@ -2790,8 +3055,18 @@ def build():
                 if "walls" in seen and seen["walls"].has(None, mx, my, band_below):
                     already["walls"] += 1
                     continue
+                # a wall elevation's base / top off the levels (only with a level below to measure from)
+                lift = MM(float(w.get("base_mm") or 0.0)) if below is not None else 0.0
+                drop = MM(float(w.get("top_mm") or 0.0)) if below is not None else 0.0
+                ln = w.get("lean") if below is not None else None
+                if ln:
+                    # leaning as a wall elevation draws it (SW13): its foot where the lean puts it
+                    p1 = XYZ(p1.X + MM(ln["base"][0]), p1.Y + MM(ln["base"][1]), p1.Z)
+                    p2 = XYZ(p2.X + MM(ln["base"][0]), p2.Y + MM(ln["base"][1]), p2.Z)
                 wall = Wall.Create(doc, Line.CreateBound(p1, p2), wt.Id,
-                                   wall_base.Id, wall_h, wall_off, False, True)
+                                   wall_base.Id, wall_h - lift + drop, wall_off + lift, False, True)
+                if ln:
+                    lean_wall(wall, ln, (wall_h - lift + drop) / MM(1.0), w.get("mark"))
                 set_mark(wall, w.get("mark"))
                 if wall_note:
                     mark_provisional(wall, "wall %s" % (w.get("mark") or ""), wall_note, XYZ(mx, my, level.Elevation))

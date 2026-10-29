@@ -5,8 +5,10 @@ it does for IFC and hands each solid to this writer instead (model_cls). Nothing
 about building is repeated here.
 
 In the file:
-* layers  <level> > <Columns | Beams | Hidden beams | Slabs | Walls | Footings ...>,
-  and under Beams and Hidden beams one layer per size - in the colour the Revit
+* layers  <Columns | Beams | Hidden beams | Slabs | Shear walls | Footings | Rafts ...>,
+  by element, not by floor (user 2026-10-28: all the beams, all the shear walls at one
+  click); each object's floor is its user text Level. Under Beams and Hidden beams
+  one layer per size - in the colour the Revit
   build's view filters give that size (revit\\build_model.py BEAM_COLOURS, in the
   same order), so the Rhino model reads like the Revit one; columns, sunk slabs
   and footings likewise one layer per size ("Column 300x600", "Sunk slab 150 mm",
@@ -24,13 +26,14 @@ from __future__ import annotations
 
 import ast
 import io
+import math
 import os
 
 from building import ifc_export, size_colours
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RED = (255, 0, 0)                           # as revit\build_model.py PROVISIONAL_RGB
-TYPE_COLOURS = {"Columns": (150, 150, 150), "Slabs": (200, 200, 200), "Walls": (170, 170, 170),
+TYPE_COLOURS = {"Columns": (150, 150, 150), "Slabs": (200, 200, 200), "Shear walls": (170, 170, 170),
                 "Footings": (150, 120, 90), "Pedestals": (130, 130, 130), "Rafts": (150, 120, 90)}
 
 
@@ -117,6 +120,26 @@ class RhinoModel:
         return _with_prism(("mesh", c, faces, size), [c[0], c[3], c[7], c[4]],
                            [c[1][i] - c[0][i] for i in range(3)])
 
+    def leaned(self, outline, z0: float, height: float, base, top):
+        """An outline in plan leaning as a wall elevation draws it: a closed mesh, its bottom
+        moved across by base, its top by top (mm)."""
+        pts = [(float(p[0]), float(p[1])) for p in outline]
+        if len(pts) > 1 and math.dist(pts[0], pts[-1]) <= 0.01:
+            pts.pop()
+        pts = _ccw(pts)                     # anticlockwise: its faces outward (a wall's comes clockwise)
+        n = len(pts)
+        verts = [(x + float(base[0]), y + float(base[1]), z0) for x, y in pts] + \
+                [(x + float(top[0]), y + float(top[1]), z0 + height) for x, y in pts]
+        faces = [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+        if n == 4:
+            faces += [(0, 3, 2, 1), (4, 5, 6, 7)]
+        else:
+            tri = _triangles(pts)
+            faces += [(i, k, j) for i, j, k in tri] + [(n + i, n + j, n + k) for i, j, k in tri]
+        s = _Solid(("mesh", verts, faces, None))
+        s.brep = True
+        return s
+
     def swept(self, a, b, profile, z_top: float, size=None):
         """A beam built to its drawn section: a closed mesh, the profile at each end."""
         import math
@@ -139,7 +162,7 @@ class RhinoModel:
             group = "Hidden beams" if mark == "SLAB FOLD" else "Beams"
         else:
             group = {"IFCCOLUMN": "Pedestals" if desc == "pedestal" else "Columns", "IFCSLAB": "Slabs",
-                     "IFCWALL": "Walls", "IFCFOOTING": "Rafts" if desc == "raft" else "Footings"}.get(kind, "Other")
+                     "IFCWALL": "Shear walls", "IFCFOOTING": "Rafts" if desc == "raft" else "Footings"}.get(kind, "Other")
         size = next((s[5] for s in solids if len(s) > 5), None) or \
             next((s[3] for s in solids if s[0] == "mesh" and s[3]), None)
         self.items.append({"level": storey_name, "group": group, "size": size, "solids": solids, "key": size_key,
@@ -181,7 +204,7 @@ class RhinoModel:
 
         for it in self.items:
             z0 = self.z.get(it["level"], 0.0)
-            parts = [it["level"] or "Model", it["group"]]
+            parts = [it["group"]]                   # by element; its floor is its Level user text
             colour = TYPE_COLOURS.get(it["group"], (120, 120, 120))
             if it["group"] in ("Beams", "Hidden beams") and it["size"]:
                 w, d = it["size"]
@@ -209,6 +232,9 @@ class RhinoModel:
                             ext.Faces.AddFace(*f)
                         ext.Normals.ComputeNormals()
                         ext.Compact()
+                        if getattr(s, "brep", False):
+                            # a leaning column or wall: its flat faces as a polysurface
+                            ext = r.Brep.CreateFromMesh(ext, True) or ext
                 else:
                     _, outline, zb, h, holes = s[:5]
                     ext = self._extrusion(outline, z0 + zb, h, holes)
@@ -229,6 +255,8 @@ class RhinoModel:
                     a.ColorSource = r.ObjectColorSource.ColorFromObject
                 if isinstance(ext, r.Mesh):
                     model.Objects.AddMesh(ext, a)
+                elif isinstance(ext, r.Brep):
+                    model.Objects.AddBrep(ext, a)
                 else:
                     model.Objects.AddExtrusion(ext, a)
         try:

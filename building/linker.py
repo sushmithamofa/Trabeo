@@ -31,7 +31,7 @@ from .merge_beams import gone
 from .marks import parse_mark
 from .readers.column_schedule import in_range
 from .sheets.levels import level_rank
-from .model import (Building, Evidence, Issue, Value, CONFLICT, MISSING, OVERRIDE, READ,
+from .model import (Building, Element, Evidence, Issue, Value, CONFLICT, MISSING, OVERRIDE, READ,
                     WARNING, INFO)
 
 READER = "linker"
@@ -47,6 +47,7 @@ WEIGHT = {
     "slab panel": 0.75,           # the bay's panel is marked; only secondary beams between
     "beam run": 0.75,             # the beam it carries on (no column between) is marked
     "beam line": 0.75,            # the same mark both ways along its straight beam line
+    "beam detail span": 0.75,     # in line with a marked beam, within the grids its detail spans
     "section dimensions": 0.7,
     "plan geometry": 0.7,
     "layer name": 0.6,
@@ -972,6 +973,7 @@ def link(b: Building, overrides: dict | None = None) -> dict[str, int]:
     panel = _panel_marks(b)                   # unmarked bays of a marked panel (secondary beams between)
     runs = _run_marks(b)                      # unmarked spans carrying on a marked beam
     lines = _line_marks(b, marks_from_captions)   # unmarked spans between two of one mark
+    over = _detail_span_marks(b, marks_from_captions)   # unmarked spans of a beam its detail runs over
     for e in b.elements:
         if e.type in ("stair", "ramp"):
             continue                    # done above: no marks, no sizes by mark
@@ -996,6 +998,9 @@ def link(b: Building, overrides: dict | None = None) -> dict[str, int]:
         elif e.type in ("beam", "beam_span") and not e.mark and e.id in lines:
             inherited = (lines[e.id], "beam line", f"on one straight beam line between two spans marked "
                          f"{lines[e.id]}, same width: the mark written at both ends of the line")
+        elif e.type in ("beam", "beam_span") and not e.mark and e.id in over:
+            inherited = (over[e.id][0], "beam detail span", f"in line with beam {over[e.id][0]}, same width, "
+                         "between the grids its beam detail runs over")
         if e.type in ("footing", "pedestal", "raft"):
             # foundation readers give their own mark sources: the tag beside the
             # footing, and the layer it is drawn on where a consultant uses one per type
@@ -1215,11 +1220,25 @@ def link(b: Building, overrides: dict | None = None) -> dict[str, int]:
     _beyond_the_beams(b, stats)
     _face_styles(b, stats)          # before the sections: a face's style says which way round
     _beam_sections(b, stats)
+    _column_ticks(b, stats)           # short lines along a column's face: not beams
+    _reseat_on_faces(b, stats)        # a marked beam paired with the wrong line: between its faces
+    _slab_edge_bands(b, stats)        # a solid slab edge paired with a beam's dashed face: slab
+    _beam_face_runs(b, stats)         # a beam runs as far as both its faces are drawn
+    _marked_bays(b, stats)            # a marked bay with no slab, once the beams are settled
     _section_heights(b, stats)        # building sections: heights off the level, slopes
     _legend_zones(b, stats)           # what the legend marks: steel roofs, columns through / ending
     levels_table.build(b, stats)
     if overrides:
         stats["overrides applied"] = apply_overrides(b, overrides)
+    for e in b.elements:
+        # a line the drawings say is not a beam (slab strip, drawn twice, part of a column)
+        # that the review gave a mark or size to is a beam, as decided
+        if any(e.resolved.get(p) is not None and e.resolved[p].status == OVERRIDE for p in ("mark", "width", "depth")):
+            for k in ("slab_strip", "same_beam_as", "not_a_beam"):
+                e.extra.pop(k, None)
+    _column_extent(b, stats)          # how far each column runs, from the column schedule's level ranges
+    _wall_heights(b, stats, overrides)  # where walls and columns start and end, from wall elevations
+    _column_stops(b, stats)           # columns the plan marks as ending at its floor, said
     _written_elsewhere(b, stats)
     _near_misses(b, stats)
     return dict(stats)
@@ -1454,8 +1473,12 @@ def _beam_sections(b: Building, stats) -> None:
     full-height side is where the slab meets the beam - the side of the beam the plan
     has slab on. Slab on both sides or on neither: a decision (as read / mirrored)."""
     for e in b.elements:
-        for k in ("section_profile", "section_profile_mirrored", "section_part"):
+        for k in ("section_profile", "section_profile_mirrored", "section_part", "slab_strip",
+                  "section_parts", "same_beam_as"):
             e.extra.pop(k, None)
+    for s in b.sheets.values():
+        s.extra.pop("section_gap_beams", None)
+        s.extra.pop("section_edge_strips", None)
     secs = defaultdict(list)
     for s in b.of("beam_section"):
         secs[(_set_of(b, s), s.mark)].append(s)
@@ -1466,6 +1489,8 @@ def _beam_sections(b: Building, stats) -> None:
         return
     own = _own_sections(b)
     used, used_sec = defaultdict(list), {}
+    sketched = defaultdict(lambda: defaultdict(list))         # (plan, section) -> what it did
+    edge_jobs = []                                            # slab edges to follow, once every cut is read
     for sid, s in b.sheets.items():
         view = s.extra.get("view_sheet", "")
         if s.reader != "plan.legacy" or view not in cuts:
@@ -1484,12 +1509,20 @@ def _beam_sections(b: Building, stats) -> None:
                                           (cands[-1] if cands else None))
             if sec is None:
                 continue
-            used_sec[c.mark] = sec
             hit = [e for e in beams if "section" not in e.resolved
                    and _crosses(c.geometry["a"], c.geometry["b"], e.geometry["start"], e.geometry["end"])]
+            if sec.extra.get("drawn_as") == "lines":
+                ref = _sized_by_sketch(hit, sec, sketched[(sid, sec.id)], beams, c)
+                if ref is not None:
+                    edge_jobs.append((view, ref, sec, beams, sketched[(sid, sec.id)]))
+                continue
+            used_sec[c.mark] = sec
             for grp in _parallel_groups(hit):
                 done = _give_section(grp, sec, c, slabs)
                 used[c.mark] += done
+    for job in edge_jobs:
+        _edge_strips(b, *job)
+    _sketch_issues(b, sketched, stats)
     for name, els in used.items():
         sec = used_sec[name]
         stats["beams built to a drawn section"] += len(els)
@@ -1504,6 +1537,1166 @@ def _beam_sections(b: Building, stats) -> None:
             b.issues.append(Issue(WARNING, "confirm", f"section {name}-{name}: some corners have no written size "
                                   f"({', '.join(sec.extra['undimensioned'])}); they are kept in proportion - check",
                                   sheet=sec.sheet, mark=f"{name}-{name}", extra={"from_linker": True}))
+
+
+def _offset(a, c) -> float | None:
+    """How far c's centreline lies from a's (signed, to a's left), if they run the same way."""
+    (px, py), (qx, qy) = a.geometry["start"][:2], a.geometry["end"][:2]
+    (ex, ey), (fx, fy) = c.geometry["start"][:2], c.geometry["end"][:2]
+    L, M = math.hypot(qx - px, qy - py) or 1.0, math.hypot(fx - ex, fy - ey) or 1.0
+    ux, uy = (qx - px) / L, (qy - py) / L
+    if abs(((fx - ex) / M) * uy - ((fy - ey) / M) * ux) > 0.035:
+        return None
+    mx, my = (ex + fx) / 2.0, (ey + fy) / 2.0
+    return (mx - px) * -uy + (my - py) * ux
+
+
+def _cut_line(hit, beams, cut, W) -> object | None:
+    """The beam whose line a section's cut marks: one the cut crosses, drawn as wide as the
+    section's beam and marked or sized; else, where the cut crosses only the slab's lines (NIFT
+    5th floor Y23, X1-X2: the mark written on the outer strip, the inner strip drawn 300 wide), a
+    beam like that further along whose line runs through the cut. Never a line merely drawn as
+    wide: a slab strip can be. None when there is no such beam."""
+    own = [a for a in hit if abs(_drawn_width(a) - W) <= 15.0 and _sized_beam(a, W)]
+    if own:
+        return own[0]
+    (ax, ay), (bx, by) = cut.geometry["a"][:2], cut.geometry["b"][:2]
+    best = None
+    for e in beams:
+        if e in hit or abs(_drawn_width(e) - W) > 15.0 or not _sized_beam(e, W):
+            continue
+        if not any(_offset(e, h) is not None for h in hit):
+            continue                                    # not running the way the crossed lines do
+        (px, py), (qx, qy) = e.geometry["start"][:2], e.geometry["end"][:2]
+        L = math.hypot(qx - px, qy - py) or 1.0
+        ux, uy = (qx - px) / L, (qy - py) / L
+        sa, sb = (ax - px) * -uy + (ay - py) * ux, (bx - px) * -uy + (by - py) * ux
+        if sa * sb > 0:
+            continue                                    # its line does not pass through the cut
+        t = ((ax + bx) / 2.0 - px) * ux + ((ay + by) / 2.0 - py) * uy
+        far = max(0.0, -t, t - L)                       # how far along from the beam the cut is
+        if best is None or far < best[0]:
+            best = (far, e)
+    return best[1] if best else None
+
+
+def _slab_strips(hit, beams, sec, ref=None) -> dict:
+    """The slab beside a beam, drawn on the plan as lines along it and read as beams.
+
+    NIFT 5th floor, SECTION A-A: the 300 x 600 edge beam with its slab running 150 past the
+    outer face and 300 past the inner one, both ends drawn. On the plan those slab edges are
+    lines 150 outside and 300 inside the beam, which the plan reader pairs with the beam's
+    faces into a 150 and a 300 wide 'beam' - with no mark and no depth. A beam the cut
+    crosses as wide as a closed flange, lying that far off the section's own beam (the
+    marked or sized one), is that strip of slab; so are its pieces carrying on in line, as
+    wide, unmarked and with no depth, still beside a beam as wide as the section's.
+    {beam id: flange}"""
+    flanges = [f for f in sec.extra.get("flanges") or [] if f.get("closed")]
+    if not flanges or not sec.extra.get("slab_thickness"):
+        return {}
+    W = float(sec.extra.get("full_width") or sec.get("width"))
+
+    def width(e):
+        try:
+            return float(e.final("width") or e.get("width") or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def loose(e):
+        dv = e.resolved.get("depth")
+        return not e.final("mark") and (dv is None or dv.status == MISSING)
+
+    owners = [ref] if ref is not None else []
+    if not owners:
+        return {}
+    ref_mark = _key_of(str(ref.final("mark") or "")) if ref.final("mark") else ""
+
+    def named_for_line(e):
+        # the beam's own mark written on its strip (NIFT Y23: '5B4A' on the outer strip):
+        # it names the beam beside it, not the strip
+        return bool(ref_mark) and _key_of(str(e.final("mark") or "")) == ref_mark
+    # the beam line the cut marks: the section's beam and its spans in line with it, as wide
+    # (NIFT 5th floor top edge: the cut 5B2 span drawn 74 mm off the line of the others)
+    line = owners + [e for e in beams if e not in owners and abs(width(e) - W) <= 15.0
+                     and any((o := _offset(a, e)) is not None and abs(o) <= W / 3.0 for a in owners)]
+
+    def overlaps(a, c):
+        (px, py), (qx, qy) = a.geometry["start"][:2], a.geometry["end"][:2]
+        L = math.hypot(qx - px, qy - py) or 1.0
+        ux, uy = (qx - px) / L, (qy - py) / L
+        ts = sorted(((x - px) * ux + (y - py) * uy) for x, y in (c.geometry["start"][:2], c.geometry["end"][:2]))
+        return ts[1] > 100.0 and ts[0] < L - 100.0
+    found = {}
+    for c in beams:
+        if c in line or not (loose(c) or named_for_line(c)):
+            continue
+        plain = not width(c) or any("plain line" in str(n) for n in c.notes)
+        drawn = _drawn_width(c) or width(c)          # as drawn: a mark may have sized it otherwise
+        for a in line:
+            off = _offset(a, c)
+            if off is None or not overlaps(a, c):
+                continue
+            side = 1.0 if off > 0 else -1.0
+            f = next((f for f in flanges if not plain and abs(drawn - f["width"]) <= 15.0
+                      and abs(abs(off) - (W / 2.0 + f["width"] / 2.0)) <= 40.0), None)
+            if f:
+                found[c.id] = (c, f, 0.0)              # its two lines are the strip's two edges
+                break
+            f = next((f for f in flanges if plain and abs(abs(off) - (W / 2.0 + f["width"])) <= 40.0), None)
+            if f:
+                # one line: the slab's edge; the strip runs from it back to the beam's face -
+                # toward the beam, said to the left or right of the line's own direction
+                same = (_unit(a)[0] * _unit(c)[0] + _unit(a)[1] * _unit(c)[1]) > 0
+                found[c.id] = (c, f, -side * f["width"] / 2.0 * (1.0 if same else -1.0))
+                break
+    return found
+
+
+def _along(a, c) -> tuple[float, float]:
+    """c's stretch along a's line: (from, to), mm from a's start."""
+    (px, py), (qx, qy) = a.geometry["start"][:2], a.geometry["end"][:2]
+    L = math.hypot(qx - px, qy - py) or 1.0
+    ux, uy = (qx - px) / L, (qy - py) / L
+    ts = sorted(((x - px) * ux + (y - py) * uy) for x, y in (c.geometry["start"][:2], c.geometry["end"][:2]))
+    return ts[0], ts[1]
+
+
+def _covered(span, others) -> float:
+    """How much of a stretch (from, to) the other stretches cover, 0 to 1."""
+    lo, hi = span
+    if hi <= lo:
+        return 0.0
+    cuts = sorted((max(lo, a), min(hi, c)) for a, c in others if c > lo and a < hi)
+    got, at = 0.0, lo
+    for a, c in cuts:
+        if c > at:
+            got += c - max(a, at)
+            at = c
+    return got / (hi - lo)
+
+
+def _section_faces(hit, beams, sec, strips, out, ref=None) -> None:
+    """The lines along a beam line read pair by pair, as the section says they lie.
+
+    NIFT 5th floor top edge: lines at -450, -150, +150 and +300 from 5B2's centre - the slab's
+    inner edge, the beam's two faces, the slab's outer edge (SECTION A-A: 300 beam, slab 300 in,
+    150 out). The plan reader pairs them every way: the beam (-150/+150), the strips (_slab_strips),
+    and the beam with a strip in one (19: -150/+300, 450 wide, captioned 5B2; 30: -450/+150, 600).
+      * a pair spanning the beam and a strip is that beam and that strip: marked or sized, the
+        beam keeps its mark, on the line at the section's width (450 explained, not a conflict);
+        unmarked, only its strip where another beam of the line already stands there;
+      * an unmarked beam inside the stretch of a marked one on the line is that beam drawn twice;
+      * an unmarked span of the line between two spans of one mark is that mark, at its size.
+    Only pairs whose BOTH faces are the section's lines; anything else is left as it was."""
+    flanges = [f for f in sec.extra.get("flanges") or [] if f.get("closed")]
+    th = sec.extra.get("slab_thickness")
+    if not flanges or not th:
+        return
+    W = float(sec.extra.get("full_width") or sec.get("width"))
+    name = f"{sec.mark}-{sec.mark}"
+    # the line is measured from the beam _cut_line found: drawn as wide as the section's and
+    # marked or sized (the marked span may be a wider pair: NIFT 19, 450 = the beam with its
+    # outer strip; or only the slab's lines crossed: NIFT Y23 X1-X2)
+    if ref is None:
+        return
+    owners = [ref]
+    edges = [W / 2.0 + f["width"] for f in flanges]
+    reach = W / 2.0 + max(f["width"] for f in flanges) + 60.0
+
+    def at(v, targets):
+        return any(abs(v - t) <= 40.0 for t in targets)
+    pieces = []                                   # (element, offset, along) on the line
+    for c in beams:
+        if c.id in strips or c.extra.get("slab_strip") or not _drawn_width(c) or \
+                any("plain line" in str(n) for n in c.notes):
+            continue
+        o = _offset(ref, c)
+        if o is None or abs(o) > reach:
+            continue
+        pieces.append((c, o, _along(ref, c)))
+    line_beams = [p for p in pieces if abs(p[1]) <= W / 3.0 and abs(_drawn_width(p[0]) - W) <= 15.0]
+    same = {}                                     # c id -> +1 / -1: runs as ref does, or against
+    for c, o, _ in pieces:
+        (px, py), (qx, qy) = ref.geometry["start"][:2], ref.geometry["end"][:2]
+        (ex, ey), (fx, fy) = c.geometry["start"][:2], c.geometry["end"][:2]
+        same[c.id] = 1.0 if (qx - px) * (fx - ex) + (qy - py) * (fy - ey) > 0 else -1.0
+    merged = []
+    for c, o, span in pieces:
+        w = _drawn_width(c)
+        lo, hi = o - w / 2.0, o + w / 2.0
+        if abs(lo + W / 2.0) <= 40.0 and abs(hi - W / 2.0) <= 40.0:
+            continue                              # the beam itself
+        if not (lo <= -W / 2.0 + 40.0 and hi >= W / 2.0 - 40.0):
+            continue                              # not across the beam: a strip, or not the section's
+        if not ((abs(lo + W / 2.0) <= 40.0 or at(-lo, edges)) and (abs(hi - W / 2.0) <= 40.0 or at(hi, edges))):
+            continue                              # a face that is none of the section's lines
+        parts = []
+        if hi > W / 2.0 + 40.0:
+            parts.append((W / 2.0 + (hi - W / 2.0) / 2.0, hi - W / 2.0))
+        if lo < -W / 2.0 - 40.0:
+            parts.append((-(W / 2.0 + (-W / 2.0 - lo) / 2.0), -W / 2.0 - lo))
+        merged.append((c, o, span, parts))
+    marked = [(c, o, span) for c, o, span in line_beams if _sized_beam(c, W)]
+    marked += [(c, o, span) for c, o, span, _ in merged if c.final("mark")]
+    ev = Evidence(reader=READER, sheet=sec.sheet, source=f"section {name}: beam {W:.0f} wide, the slab "
+                  + " / ".join(f"{f['width']:.0f}" for f in flanges) + f" past its faces, {th['mm']:.0f} thick",
+                  text=sec.extra.get("title", ""))
+    for c, o, span, parts in merged:
+        keep_beam = bool(c.final("mark")) or _covered(span, [s for x, _, s in line_beams + marked if x is not c]) < 0.8
+        sgn = same[c.id]
+        c.extra["section_parts"] = {
+            "section": name,
+            "beam": {"shift": round(-o * sgn, 1), "width": W} if keep_beam else None,
+            "strips": [{"shift": round((t - o) * sgn, 1), "width": round(f, 1), "thickness": th["mm"],
+                        "written": bool(th.get("written"))} for t, f in parts]}
+        wv = c.resolved.get("width")
+        if keep_beam and wv is not None and wv.status == CONFLICT and abs(float(wv.value or 0) - W) <= 15.0:
+            # the plan's wider pair is the beam with its slab beside it: no conflict left
+            c.resolved["width"] = Value(W, READ, 0.9, [ev] + wv.evidence)
+        if not keep_beam:
+            c.resolved["kind"] = Value("slab edge strip", READ, 0.85, [ev])
+            dv = c.resolved.get("depth")
+            if dv is not None and dv.status == MISSING:
+                c.resolved["depth"] = Value(None, MISSING, 0.0, [])
+        out["merged"].append(c)
+    # the same beam drawn twice: an unmarked one inside a marked one's stretch on the line
+    twice = set()
+    for c, o, span in line_beams:
+        if c in owners or not _loose_beam(c):
+            continue
+        for m, _, mspan in marked:
+            if m is not c and _covered(span, [mspan]) >= 0.8:
+                c.extra["same_beam_as"] = m.id
+                c.resolved["kind"] = Value(f"beam {m.final('mark') or ''} drawn twice", READ, 0.85, [ev])
+                twice.add(c.id)
+                out["twice"].append(c)
+                break
+    # unmarked spans of the line between two spans of one mark
+    for c, o, span in line_beams:
+        if c.id in twice or not _loose_beam(c):
+            continue
+        mid = (span[0] + span[1]) / 2.0
+        before = [(s[1], m) for m, _, s in marked if s[1] <= mid]
+        after = [(s[0], m) for m, _, s in marked if s[0] >= mid]
+        if not before or not after:
+            continue
+        left, right = max(before, key=lambda x: x[0])[1], min(after, key=lambda x: x[0])[1]
+        mk = left.final("mark")
+        if not mk or _key_of(str(mk)) != _key_of(str(right.final("mark") or "")):
+            continue
+        lev = Evidence(reader=READER, sheet=c.sheet, source=f"beam line: between two spans of {mk} on the line "
+                       f"section {name} marks, as wide", text=str(mk))
+        c.resolved["mark"] = Value(mk, READ, 0.75, [lev])
+        for p in ("width", "depth"):
+            v = left.resolved.get(p)
+            if v is not None and v.status in (READ, OVERRIDE) and v.value:
+                c.resolved[p] = Value(v.value, READ, 0.75, [lev] + v.evidence[:2])
+        out["line"].append(c)
+    _beam_line_gaps(ref, line_beams, merged, strips, twice, W, name, out)
+
+
+def _beam_line_gaps(ref, line_beams, merged, strips, twice, W, name, out) -> None:
+    """The beam where the plan reader made only its slab strips, and no beam twice.
+
+    With the beam's two faces and both slab edges drawn along a stretch (NIFT 5th floor, Y12-Y13),
+    the reader may pair each face with the slab edge beside it: two strips, no beam. The strips'
+    inner edges ARE the beam's faces - so between two spans of one mark on the line, a gap lined
+    (80 %) by this section's strips is that beam, at that mark and size. And a pair split into beam +
+    strip (_section_faces) starts its beam where a span of the line already standing ends."""
+    pieces = []                                          # (from, to, element) beams standing on the line
+    for c, o, span in line_beams:
+        if c.id not in twice and (c.final("mark") or not _loose_beam(c)):
+            pieces.append((span[0], span[1], c))
+    for c, o, span, _ in merged:
+        bp = (c.extra.get("section_parts") or {}).get("beam")
+        if not bp:
+            continue
+        lo, hi = span
+        for a, z, _x in pieces:                          # trimmed where a span of the line stands
+            if a <= lo + 100.0 < z:
+                lo = max(lo, z)
+            if a < hi - 100.0 <= z:
+                hi = min(hi, a)
+        if hi - lo < 100.0:
+            continue
+        # kept along c's own direction: mm from its start
+        bp["from"], bp["to"] = ((round(lo - span[0], 1), round(hi - span[0], 1)) if _dir_same(ref, c)
+                                else (round(span[1] - hi, 1), round(span[1] - lo, 1)))
+        if bp["from"] > 1.0 or bp["to"] < span[1] - span[0] - 1.0:
+            out["trimmed"].append(c)
+        pieces.append((lo, hi, c))
+    pieces.sort(key=lambda p: p[0])
+    lined = [_along(ref, e) for e, _f, _s in strips.values()] + \
+        [span for c, _o, span, parts in merged if parts]
+    (px, py), (qx, qy) = ref.geometry["start"][:2], ref.geometry["end"][:2]
+    L = math.hypot(qx - px, qy - py) or 1.0
+    ux, uy = (qx - px) / L, (qy - py) / L
+    for (a0, a1, left), (b0, b1, right) in zip(pieces, pieces[1:]):
+        mk = left.final("mark")
+        if not mk or _key_of(str(mk)) != _key_of(str(right.final("mark") or "")) or b0 - a1 <= 2.0 * W:
+            continue                                     # (a break the width of a column is the column)
+        if _covered((a1, b0), lined) < 0.8:
+            continue
+        dv, wv = left.resolved.get("depth"), left.resolved.get("width")
+        if dv is None or dv.status not in (READ, OVERRIDE) or not dv.value:
+            continue
+        out["gap_beams"].append({"start": [px + ux * a1, py + uy * a1], "end": [px + ux * b0, py + uy * b0], "mark": mk,
+                     "width": float(wv.value) if wv is not None and wv.value else W, "depth": float(dv.value),
+                     "section": name, "between": [left.id, right.id]})
+    # past the line's last beam: where the section's strips line BOTH sides (the outer and the
+    # inner slab edge drawn, so both beam faces are there - NIFT Y23, X1-X2: '5B4A' written on
+    # the outer strip, no beam pair), the beam carries on as far as both strips go
+    if not pieces:
+        return
+    sides = {1: [], -1: []}
+    for e, _f, shift in strips.values():
+        o = _offset(ref, e)
+        if o is not None:
+            o += shift if _dir_same(ref, e) else -shift
+            sides[1 if o > 0 else -1].append(_along(ref, e))
+    for c, _o, span, parts in merged:
+        for t, _f in parts:
+            sides[1 if t > 0 else -1].append(span)
+    both = [(max(a, c), min(z, d)) for a, z in _union(sides[1]) for c, d in _union(sides[-1])
+            if min(z, d) - max(a, c) > 0]
+    for (p0, p1, end), outward in ((pieces[0], -1), (pieces[-1], 1)):
+        mk = end.final("mark")
+        dv, wv = end.resolved.get("depth"), end.resolved.get("width")
+        if not mk or dv is None or dv.status not in (READ, OVERRIDE) or not dv.value:
+            continue
+        at = p0 if outward < 0 else p1
+        for lo, hi in both:
+            far = lo if outward < 0 else hi
+            near = hi if outward < 0 else lo
+            if outward * (far - at) > 2.0 * W and outward * (at - near) >= -2.0 * W:
+                a, z = sorted((at, far))
+                out["gap_beams"].append({"start": [px + ux * a, py + uy * a], "end": [px + ux * z, py + uy * z],
+                                         "mark": mk, "width": float(wv.value) if wv is not None and wv.value else W,
+                                         "depth": float(dv.value), "section": name, "between": [end.id]})
+
+
+def _union(spans) -> list:
+    """Stretches (from, to) joined where they overlap."""
+    out: list[list[float]] = []
+    for a, z in sorted(spans):
+        if out and a <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], z)
+        else:
+            out.append([a, z])
+    return [tuple(x) for x in out]
+
+
+def _dir_same(a, c) -> bool:
+    (px, py), (qx, qy) = a.geometry["start"][:2], a.geometry["end"][:2]
+    (ex, ey), (fx, fy) = c.geometry["start"][:2], c.geometry["end"][:2]
+    return (qx - px) * (fx - ex) + (qy - py) * (fy - ey) > 0
+
+
+def _beam_width(e) -> float:
+    try:
+        return float(e.final("width") or e.get("width") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _drawn_width(e) -> float:
+    """The width the plan draws it at (its two lines apart), whatever it is resolved to."""
+    try:
+        return float(e.get("width") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _loose_beam(e) -> bool:
+    """No mark and no depth of its own."""
+    dv = e.resolved.get("depth")
+    return not e.final("mark") and (dv is None or dv.status == MISSING)
+
+
+def _sized_beam(e, W) -> bool:
+    """As wide as a section's beam, and marked or given a depth."""
+    dv = e.resolved.get("depth")
+    return abs(_beam_width(e) - W) <= 15.0 and (bool(e.final("mark")) or (dv is not None and dv.status in (READ, OVERRIDE)))
+
+
+def _beam_face_runs(b: Building, stats) -> None:
+    """A beam runs as far as both its faces are drawn.
+
+    NIFT 4th floor, 4B2 by the stair: both faces drawn the whole bay (4.85 m, 4B6A to 4B9), but
+    lines of the stair close beside it drew the plan reader's pair off - it stopped at 2.8 m, and
+    the last 2 m of the beam was never made. Read from the plan's own beam-layer lines (readers/
+    linework): where a beam's two face lines (its width apart) carry on past its end, in line,
+    and no beam of the line stands there, it carries on to where its faces end - its own mark and
+    size (marked or sized only: nothing guessed). Faces end at the supports. Kept with the beams
+    _beam_line_gaps finds (sheet extra "section_gap_beams"), built the same way."""
+    for sid, s in b.sheets.items():
+        vs = b.sheets.get(s.extra.get("view_sheet", ""))
+        lines = ((vs.extra.get("beam_lines") or {}).get("lines") or []) if vs else []
+        if s.reader != "plan.legacy" or not lines:
+            continue
+        beams = [e for e in b.elements if e.sheet == sid and e.type in ("beam", "beam_span") and not gone(e)
+                 and e.geometry.get("start") and e.geometry.get("end") and not e.geometry.get("mid")
+                 and not any(e.extra.get(k) for k in ("slab_strip", "same_beam_as", "not_a_beam", "section_parts"))]
+        made = s.extra.setdefault("section_gap_beams", [])
+        for e in beams:
+            w = _drawn_width(e)
+            dv, wv = e.resolved.get("depth"), e.resolved.get("width")
+            if not w or not e.final("mark") or dv is None or dv.status not in (READ, OVERRIDE) or not dv.value:
+                continue
+            (px, py), (qx, qy) = e.geometry["start"][:2], e.geometry["end"][:2]
+            L = math.hypot(qx - px, qy - py)
+            if L <= 0:
+                continue
+            ux, uy = (qx - px) / L, (qy - py) / L
+            tol = min(40.0, w / 6.0)
+            faces = {1.0: [], -1.0: []}
+            for _lay, x0, y0, x1, y1, _dash in lines:
+                a0, a1 = (x0 - px) * ux + (y0 - py) * uy, (x1 - px) * ux + (y1 - py) * uy
+                o0, o1 = (x0 - px) * -uy + (y0 - py) * ux, (x1 - px) * -uy + (y1 - py) * ux
+                if abs(a1 - a0) < 1.0 or abs(o1 - o0) > 0.01 * abs(a1 - a0) + 2.0:
+                    continue
+                for side in (1.0, -1.0):
+                    if abs((o0 + o1) / 2.0 - side * w / 2.0) <= tol:
+                        faces[side].append(tuple(sorted((a0, a1))))
+            # pieces of a face 100 mm apart or less are one face (a dash pattern drawn as lines)
+            joined = {k: [(a + 50.0, z - 50.0) for a, z in _union([(a - 50.0, z + 50.0) for a, z in v])]
+                      for k, v in faces.items()}
+            both = [(max(a, c), min(z, d)) for a, z in joined[1.0] for c, d in joined[-1.0] if min(z, d) - max(a, c) > 0]
+            # the rest of the line: other beams in line, as wide, and pieces already made
+            others = []
+            for o in b.elements:
+                if o is e or o.sheet != sid or o.type not in ("beam", "beam_span") or gone(o) \
+                        or not o.geometry.get("start") or o.extra.get("slab_strip") or o.extra.get("not_a_beam"):
+                    continue
+                oo = _offset(e, o)
+                if oo is None:
+                    continue
+                # a beam already standing over most of its width there, whatever its own width
+                # (Sasan Gir terrace: B4's line runs inside B2E, the 750 edge beam - B2E's outer
+                # face and the slope line drawn inside it are 230 apart, like B4's two faces)
+                wo = _drawn_width(o) or _beam_width(o)
+                over = min(w / 2.0, oo + wo / 2.0) - max(-w / 2.0, oo - wo / 2.0)
+                if over >= 0.5 * w or ((o.extra.get("section_parts") or {}).get("beam") and abs(oo) <= w):
+                    others.append(_along(e, o))           # a beam of the line (a split pair's too)
+            for g in made:
+                ga = (g["start"][0] - px) * ux + (g["start"][1] - py) * uy
+                gz = (g["end"][0] - px) * ux + (g["end"][1] - py) * uy
+                go = ((g["start"][0] + g["end"][0]) / 2.0 - px) * -uy + ((g["start"][1] + g["end"][1]) / 2.0 - py) * ux
+                if abs(go) <= w / 3.0:
+                    others.append(tuple(sorted((ga, gz))))
+            for lo, hi in both:
+                stretches = []                            # where its faces carry on past its end / before its start
+                if lo <= L + 50.0 and hi > L:
+                    stretches.append((L, hi))
+                if lo < 0.0 and hi >= -50.0:
+                    stretches.append((lo, 0.0))
+                for a, z in stretches:
+                    if z - a <= 2.0 * w:
+                        continue
+                    if _covered((a, z), _union(others)) > 0.2:
+                        continue                          # a beam of the line stands there
+                    made.append({"start": [px + ux * a, py + uy * a], "end": [px + ux * z, py + uy * z],
+                                 "mark": e.final("mark"), "width": float(wv.value) if wv is not None and wv.value else w,
+                                 "depth": float(dv.value), "section": "", "between": [e.id],
+                                 "why": f"its two faces are drawn {z - a:.0f} mm further than the plan reader's beam"})
+                    others.append((a, z))
+                    b.issues.append(Issue(INFO, "geometry", f"beam {e.final('mark')}: both its faces drawn {z - a:.0f} mm "
+                                          "past where the plan reader's beam stops - carried on to where they end",
+                                          sheet=sid, elements=[e.id], mark=str(e.final("mark")),
+                                          extra={"from_linker": True}))
+                    stats["beams carried on along their drawn faces"] += 1
+
+
+def _reseat_on_faces(b: Building, stats) -> None:
+    """A marked beam the plan reader paired with the wrong line: put between its two drawn faces.
+
+    NIFT 3rd floor top edge, 3B1 (detail 300 x 600): its faces are two dashed lines 300 apart,
+    the slab's edge a solid line 150 outside them. The reader paired the slab edge with the
+    outer face - 3B1 150 wide, 75 out of place - and left the inner face as loose lines, built as
+    beams with no width. Where a marked beam's width from its detail or schedule disagrees with
+    the lines it was paired from, and the plan draws two lines exactly that width apart along it
+    (80 % of its length), one of them a face it was paired from, it stands between those two -
+    at that width (its parts kept as section_parts.beam, built as the split pairs are). Loose lines
+    (no width, no mark) lying on those faces are those faces, not beams (extra not_a_beam)."""
+    for sid, s in b.sheets.items():
+        vs = b.sheets.get(s.extra.get("view_sheet", ""))
+        lines = ((vs.extra.get("beam_lines") or {}).get("lines") or []) if vs else []
+        if s.reader != "plan.legacy" or not lines:
+            continue
+        els = [e for e in b.elements if e.sheet == sid and e.type in ("beam", "beam_span") and not gone(e)
+               and e.geometry.get("start") and e.geometry.get("end") and not e.geometry.get("mid")]
+        for e in els:
+            if any(e.extra.get(k) for k in ("slab_strip", "section_parts", "same_beam_as", "not_a_beam")):
+                continue
+            w, wv = _drawn_width(e), e.resolved.get("width")
+            if not w or not e.final("mark") or wv is None or wv.status not in (READ, OVERRIDE, CONFLICT) or not wv.value:
+                continue
+            given = any(any(k in ev.source for k in ("detail caption", "schedule table", "review")) for ev in wv.evidence)
+            W = float(wv.value) if given else None        # a width its detail / schedule gives, if any
+            if W is not None and abs(W - w) <= 15.0:
+                continue
+            (px, py), (qx, qy) = e.geometry["start"][:2], e.geometry["end"][:2]
+            L = math.hypot(qx - px, qy - py)
+            if L < 600.0:
+                continue
+            ux, uy = (qx - px) / L, (qy - py) / L
+            near = []                                     # (offset, stretch, dashed) of the lines along it
+            for _lay, x0, y0, x1, y1, d in lines:
+                a0, a1 = (x0 - px) * ux + (y0 - py) * uy, (x1 - px) * ux + (y1 - py) * uy
+                o0, o1 = (x0 - px) * -uy + (y0 - py) * ux, (x1 - px) * -uy + (y1 - py) * ux
+                if abs(a1 - a0) < 1.0 or abs(o1 - o0) > 0.01 * abs(a1 - a0) + 2.0:
+                    continue
+                o = (o0 + o1) / 2.0
+                if abs(o) <= 760.0 + w:
+                    near.append((o, tuple(sorted((a0, a1))), bool(d)))
+            # one line drawn in pieces sits a few mm differently bay to bay: within 15 mm, one line
+            groups: list[list] = []
+            for o, span, d in sorted(near):
+                if groups and o - groups[-1][-1][0] <= 15.0:
+                    groups[-1].append((o, span, d))
+                else:
+                    groups.append([(o, span, d)])
+            faces = {}                                    # offset -> drawn dashed, for lines along 80 % of it
+            for g in groups:
+                if _covered((0.0, L), _union([sp for _o, sp, _d in g])) >= 0.8:
+                    faces[sum(o for o, _sp, _d in g) / len(g)] = all(d for _o, _sp, d in g)
+            own = [f for f in faces if abs(abs(f) - w / 2.0) <= 15.0]          # lines it was paired from
+            best = None
+            if W is not None:
+                # the width its detail gives: two lines that far apart, one of its own
+                for f1 in own:
+                    for f2 in faces:
+                        if abs(abs(f2 - f1) - W) <= 10.0 and (best is None or abs(abs(f2 - f1) - W) < best[0]):
+                            best = (abs(abs(f2 - f1) - W), f1, f2)
+                why = f"its two faces drawn {W:.0f} apart, as its {'detail' if 'detail' in str(wv.evidence) else 'schedule'} gives it"
+            elif len(own) == 2 and faces[own[0]] != faces[own[1]]:
+                # no width given: paired from a solid line (the slab's edge, seen from above) and a
+                # dashed one (a face under the slab) - its other face is the next dashed line past
+                # the dashed one, 150-750 away: a beam's faces are both under the slab
+                fd = next(f for f in own if faces[f])
+                fs = next(f for f in own if not faces[f])
+                side = 1.0 if fd > fs else -1.0
+                beyond = sorted((f for f, dsh in faces.items() if dsh and side * (f - fd) >= 150.0
+                                 and side * (f - fd) <= 750.0), key=lambda f: side * (f - fd))
+                if beyond:
+                    f2 = beyond[0]
+                    W = float(round(abs(f2 - fd) / 5.0) * 5.0)
+                    # only a width this plan's beams are drawn at (3 or more): NIFT 3B1 300, as its
+                    # neighbours; never a width nothing else has (Sasan Gir hotel: 230 -> 415, a guess)
+                    if sum(1 for o in els if o is not e and abs(_drawn_width(o) - W) <= 10.0) >= 3:
+                        best = (0.0, fd, f2)
+                why = (f"paired from the slab's edge (solid) and a face (dashed); its faces are the two dashed lines "
+                       f"{W or 0:.0f} apart")
+            if best is None:
+                continue
+            _, f1, f2 = best
+            shift = (f1 + f2) / 2.0
+            # never onto a beam already standing there (Akanistha B2: moved onto its faces it would
+            # have lain 0.9 m over the next B2 span of the same line) - then left as it was
+            taken = False
+            for o in els:
+                if o is e or any(o.extra.get(k) for k in ("slab_strip", "not_a_beam", "same_beam_as")):
+                    continue
+                oo = _offset(e, o)
+                if oo is None or abs(oo - shift) > W / 3.0:
+                    continue
+                oa, oz = _along(e, o)
+                if min(oz, L) - max(oa, 0.0) > 0.2 * L:
+                    taken = True
+                    break
+            if taken:
+                continue
+            ev = Evidence(reader=READER, sheet=sid, source=why, text=str(e.final("mark")))
+            strips = []
+            if not given:
+                e.resolved["width"] = Value(W, READ, 0.8, [ev] + wv.evidence[:2])
+                # the slab runs out to its edge (the solid line): the band the reader paired, between
+                # that edge and the beam's face, is slab - as thick as the slab in the bay beside it
+                t = _slab_beside(b, sid, e, shift, W)
+                if t is not None:
+                    strips.append({"shift": 0.0, "width": round(w, 1), "thickness": float(t.value), "written": True})
+            e.extra["section_parts"] = {"section": "", "beam": {"shift": round(shift, 1), "width": W}, "strips": strips}
+            if wv.status == CONFLICT:
+                e.resolved["width"] = Value(W, READ, 0.9, [ev] + wv.evidence)
+            # loose lines on those faces are the faces
+            for o in els:
+                if o is e or o.final("mark") or _drawn_width(o) or o.extra.get("not_a_beam"):
+                    continue
+                oo = _offset(e, o)
+                if oo is None or min(abs(oo - f1), abs(oo - f2)) > 15.0:
+                    continue
+                oa, oz = _along(e, o)
+                if oa >= -100.0 and oz <= L + 100.0:
+                    o.extra["not_a_beam"] = f"a face of beam {e.final('mark')} (its two faces drawn {W:.0f} apart)"
+            b.issues.append(Issue(INFO, "geometry", f"beam {e.final('mark')}: paired from lines {w:.0f} apart, but its "
+                                  f"faces are drawn {W:.0f} apart as its detail gives - built between them",
+                                  sheet=sid, elements=[e.id], mark=str(e.final("mark")), extra={"from_linker": True}))
+            stats["beams put between their drawn faces"] += 1
+
+
+def _slab_edge_bands(b: Building, stats) -> None:
+    """The slab running past a beam to its drawn edge, read off the linework (no section needed).
+
+    NIFT 4th floor east end: the beam's faces are dashed (under the slab), the slab's edge a
+    solid line 150 outside (seen from above). The reader paired the solid edge with the outer
+    face - an unmarked 150 wide 'beam' with no depth, built red - and it stopped 2.1 m short of
+    where both lines run. Such a pair (no mark, no depth; one solid line, one dashed line), whose
+    dashed line is the face of a beam standing beside it, is the slab's edge band: built as slab,
+    as thick as the slab on the beam's other side, along wherever the solid edge and that face are
+    both drawn (sheet extra section_edge_strips). No slab beside the beam: nothing guessed."""
+    from shapely.geometry import LineString, Point, Polygon
+    for sid, s in b.sheets.items():
+        vs = b.sheets.get(s.extra.get("view_sheet", ""))
+        lines = ((vs.extra.get("beam_lines") or {}).get("lines") or []) if vs else []
+        if s.reader != "plan.legacy" or not lines:
+            continue
+        els = [e for e in b.elements if e.sheet == sid and e.type in ("beam", "beam_span") and not gone(e)
+               and e.geometry.get("start") and e.geometry.get("end") and not e.geometry.get("mid")]
+        standing = [m for m in els if not _loose_beam(m) and _drawn_width(m)
+                    and not any(m.extra.get(k) for k in ("slab_strip", "not_a_beam", "same_beam_as"))]
+        slabs = [(Polygon([tuple(p[:2]) for p in x.geometry["outline"]]).buffer(0), x.resolved["thickness"])
+                 for x in b.elements if x.sheet == sid and x.type == "slab" and len(x.geometry.get("outline") or []) >= 3
+                 and x.resolved.get("thickness") is not None and x.resolved["thickness"].status in (READ, OVERRIDE)
+                 and x.resolved["thickness"].value]
+        for e in els:
+            w = _drawn_width(e)
+            if not _loose_beam(e) or not w or w > 400.0 or any(
+                    e.extra.get(k) for k in ("slab_strip", "not_a_beam", "same_beam_as", "section_parts")):
+                continue
+            (px, py), (qx, qy) = e.geometry["start"][:2], e.geometry["end"][:2]
+            L = math.hypot(qx - px, qy - py)
+            if L < 600.0:
+                continue
+            ux, uy = (qx - px) / L, (qy - py) / L
+            sides = {1.0: [], -1.0: []}                 # its two lines: stretches and dashed or not
+            for _lay, x0, y0, x1, y1, d in lines:
+                a0, a1 = (x0 - px) * ux + (y0 - py) * uy, (x1 - px) * ux + (y1 - py) * uy
+                o0, o1 = (x0 - px) * -uy + (y0 - py) * ux, (x1 - px) * -uy + (y1 - py) * ux
+                if abs(a1 - a0) < 1.0 or abs(o1 - o0) > 0.01 * abs(a1 - a0) + 2.0:
+                    continue
+                for side in (1.0, -1.0):
+                    if abs((o0 + o1) / 2.0 - side * w / 2.0) <= 15.0:
+                        sides[side].append((tuple(sorted((a0, a1))), bool(d)))
+            kind = {}
+            for side, got in sides.items():
+                on = [sp for sp, _d in got]
+                if on and _covered((0.0, L), _union(on)) >= 0.8:
+                    kind[side] = all(d for _sp, d in got)
+            if len(kind) != 2 or kind[1.0] == kind[-1.0]:
+                continue                                  # not one solid and one dashed line
+            face = 1.0 if kind[1.0] else -1.0             # the dashed line: a beam's face
+            m = None
+            for cand in standing:
+                oo = _offset(e, cand)
+                if oo is None or abs(abs(oo - face * w / 2.0) - _drawn_width(cand) / 2.0) > 15.0 \
+                        or face * (oo - face * w / 2.0) <= 0:
+                    continue                              # its face is not on that dashed line, beyond it
+                ca, cz = _along(e, cand)
+                if min(cz, L) - max(ca, 0.0) > 0.3 * L:
+                    m = cand
+                    break
+            if m is None:
+                continue
+            # the slab on the beam's other side: its thickness
+            beyond = face * (w / 2.0 + _drawn_width(m) + 300.0)
+            probe = LineString([(px + ux * 0.25 * L - uy * beyond, py + uy * 0.25 * L + ux * beyond),
+                                (px + ux * 0.75 * L - uy * beyond, py + uy * 0.75 * L + ux * beyond)])
+            t = next((th for poly, th in slabs if poly.buffer(300.0).intersects(probe)), None)
+            if t is None:
+                continue
+            ev = Evidence(reader=READER, sheet=sid, source=f"the slab's edge (solid) beside beam {m.final('mark') or ''}'s "
+                          f"face (dashed): slab {float(t.value):.0f} thick, as beside it", text="")
+            e.extra["slab_strip"] = {"section": "", "width": round(w, 1), "thickness": float(t.value),
+                                     "written": True, "shift": 0.0}
+            e.resolved["kind"] = Value("slab edge strip", READ, 0.8, [ev])
+            b.issues = [i for i in b.issues if not (i.category == "missing" and i.elements == [e.id])]
+            stats["slab edge bands read off the linework"] += 1
+            # ... along wherever the solid edge and the beam's dashed face are both drawn
+            solid_side = -face
+            edge_at, face_at = solid_side * w / 2.0, face * w / 2.0
+            runs = {"edge": [], "face": []}
+            for _lay, x0, y0, x1, y1, d in lines:
+                a0, a1 = (x0 - px) * ux + (y0 - py) * uy, (x1 - px) * ux + (y1 - py) * uy
+                o0, o1 = (x0 - px) * -uy + (y0 - py) * ux, (x1 - px) * -uy + (y1 - py) * ux
+                if abs(a1 - a0) < 1.0 or abs(o1 - o0) > 0.01 * abs(a1 - a0) + 2.0:
+                    continue
+                o = (o0 + o1) / 2.0
+                if abs(o - edge_at) <= 15.0 and not d:
+                    runs["edge"].append(tuple(sorted((a0, a1))))
+                elif abs(o - face_at) <= 15.0 and d:
+                    runs["face"].append(tuple(sorted((a0 - 50.0, a1 + 50.0))))
+            both = [(max(a, c), min(z, dd)) for a, z in _union(runs["edge"]) for c, dd in _union(runs["face"])
+                    if min(z, dd) - max(a, c) > 0]
+            have = s.extra.setdefault("section_edge_strips", [])
+            for lo, hi in both:
+                for a, z in _uncovered((lo, hi), [(0.0, L)]):
+                    if z - a <= 600.0:
+                        continue
+                    h = w / 2.0
+                    pts = [(a, -h), (z, -h), (z, h), (a, h)]
+                    have.append({"outline": [[px + ux * tt - uy * oo, py + uy * tt + ux * oo] for tt, oo in pts],
+                                 "width": round(w, 1), "thickness": float(t.value), "written": True, "section": ""})
+
+
+def _slab_beside(b: Building, sid: str, e, shift: float, W: float):
+    """The settled thickness of the slab against a beam's inner face (the side away from the
+    shift's slab edge) - a slab within 600 mm of that face along its middle half - or None."""
+    from shapely.geometry import LineString, Polygon
+    (px, py), (qx, qy) = e.geometry["start"][:2], e.geometry["end"][:2]
+    L = math.hypot(qx - px, qy - py) or 1.0
+    ux, uy = (qx - px) / L, (qy - py) / L
+    inner = shift + (W / 2.0 if shift > 0 else -W / 2.0)          # the face away from the edge band at 0
+    side = 1.0 if shift > 0 else -1.0
+    probe = inner + side * 300.0
+    seg = LineString([(px + ux * 0.25 * L - uy * probe, py + uy * 0.25 * L + ux * probe),
+                      (px + ux * 0.75 * L - uy * probe, py + uy * 0.75 * L + ux * probe)])
+    for s in b.elements:
+        o = s.geometry.get("outline") or []
+        if s.sheet != sid or s.type != "slab" or len(o) < 3:
+            continue
+        t = s.resolved.get("thickness")
+        if t is None or t.status not in (READ, OVERRIDE) or not t.value:
+            continue
+        if Polygon([tuple(p[:2]) for p in o]).buffer(0).buffer(300.0).intersects(seg):
+            return t
+    return None
+
+
+def _marked_bays(b: Building, stats) -> None:
+    """A bay closed by beams, with a slab mark written in it and no slab there, is that slab.
+
+    slab_panels.make makes panels from the beam bays only on a plan where the plan reader found
+    no slab at all. NIFT's plans have some slab outlines, so its marked bays without one (2nd
+    floor S3, S3, S4; 4th floor S2 by the stair) had no slab. Here, once the beams are settled
+    (the pieces _beam_line_gaps and _beam_face_runs added close bays too): any bay of the beam
+    network holding one slab mark, that no slab covers, gets a panel - its thickness from a
+    settled slab of that mark on the floor, else that mark's slab schedule row. Bays with no
+    mark, two marks, or a slab already over part of them are left alone."""
+    from shapely.geometry import LineString, Point, Polygon
+    from shapely.ops import unary_union
+    from .export import beam_line
+    from .slab_panels import _snap
+    for sid, s in b.sheets.items():
+        if s.reader != "plan.legacy":
+            continue
+        els = [e for e in b.elements if e.sheet == sid]
+        slabs = []
+        for e in els:
+            o = e.geometry.get("outline") or []
+            if e.type == "slab" and len(o) >= 3 and not (e.resolved.get("excluded") and e.resolved["excluded"].value):
+                slabs.append((Polygon([tuple(p[:2]) for p in o]).buffer(0), e))
+        caps = [c for c in b.of("caption") if c.sheet == s.extra.get("view_sheet", "") and c.get("family") == "slab"
+                and c.mark and c.geometry.get("at")]
+        open_caps = [c for c in caps if not any(p.buffer(10.0).contains(Point(*c.geometry["at"][:2])) for p, _ in slabs)]
+        if not open_caps:
+            continue
+        cols = [(e.geometry["x"], e.geometry["y"]) for e in els if e.type == "column" and e.geometry.get("x") is not None]
+        lines = []
+        for e in els:
+            if e.type not in ("beam", "beam_span") or gone(e) or not e.geometry.get("start") or not e.geometry.get("end") \
+                    or e.geometry.get("mid") or any(e.extra.get(k) for k in ("slab_strip", "not_a_beam", "same_beam_as")):
+                continue
+            ends = (e.geometry["start"][:2], e.geometry["end"][:2])
+            if e.extra.get("section_parts"):
+                ends = beam_line(e)
+                if ends is None:
+                    continue
+            w = _drawn_width(e) or 230.0
+            a, c = _snap(tuple(ends[0]), cols, max(600.0, 2 * w)), _snap(tuple(ends[1]), cols, max(600.0, 2 * w))
+            if math.dist(a, c) > 1.0:
+                lines.append(LineString([a, c]))
+        for e in els:
+            # an RC wall closes a bay as a beam does (NIFT 2nd floor S3, S3, S4: their far side is
+            # the RCC wall) - its runs' centrelines; masonry never
+            if e.type != "wall" or e.final("role") == "masonry" or e.resolved.get("excluded"):
+                continue
+            for r in e.extra.get("runs") or []:
+                if r.get("start") and r.get("end"):
+                    reach = max(600.0, 2 * float(r.get("thickness") or 230.0))
+                    a, c = _snap(tuple(r["start"][:2]), cols, reach), _snap(tuple(r["end"][:2]), cols, reach)
+                    if math.dist(a, c) > 1.0:
+                        lines.append(LineString([a, c]))
+        # ... and an RC wall the plan reader did not make an element of: two parallel lines on an RC
+        # wall layer 100-450 apart (readers/linework, sheet wall_lines) - its centreline where both run
+        vw = b.sheets.get(s.extra.get("view_sheet", ""))
+        wl = [((x0, y0), (x1, y1)) for x0, y0, x1, y1 in ((vw.extra.get("wall_lines") or []) if vw else [])]
+        for i, (a0, a1) in enumerate(wl):
+            La = math.dist(a0, a1)
+            ux, uy = (a1[0] - a0[0]) / La, (a1[1] - a0[1]) / La
+            for b0, b1 in wl[i + 1:]:
+                Lb = math.dist(b0, b1)
+                if abs(ux * (b1[1] - b0[1]) / Lb - uy * (b1[0] - b0[0]) / Lb) > 0.01:
+                    continue
+                o = (b0[0] - a0[0]) * -uy + (b0[1] - a0[1]) * ux
+                if not 100.0 <= abs(o) <= 450.0:
+                    continue
+                ts = sorted(((b0[0] - a0[0]) * ux + (b0[1] - a0[1]) * uy, (b1[0] - a0[0]) * ux + (b1[1] - a0[1]) * uy))
+                lo, hi = max(0.0, ts[0]), min(La, ts[1])
+                if hi - lo < 600.0:
+                    continue
+                p = (a0[0] + ux * lo - uy * o / 2.0, a0[1] + uy * lo + ux * o / 2.0)
+                q = (a0[0] + ux * hi - uy * o / 2.0, a0[1] + uy * hi + ux * o / 2.0)
+                reach = max(600.0, 2 * abs(o))
+                a, c = _snap(p, cols, reach), _snap(q, cols, reach)
+                if math.dist(a, c) > 1.0:
+                    lines.append(LineString([a, c]))
+        for g in s.extra.get("section_gap_beams") or []:
+            # carried to the column centre at an end, as the beams are (they stop at its face)
+            reach = max(600.0, 2 * float(g.get("width") or 230.0))
+            a, c = _snap(tuple(g["start"][:2]), cols, reach), _snap(tuple(g["end"][:2]), cols, reach)
+            if math.dist(a, c) > 1.0:
+                lines.append(LineString([a, c]))
+        if len(lines) < 3:
+            continue
+        taken = unary_union([p for p, _ in slabs]) if slabs else None
+        made = 0
+        # each mark's bay: the region round it the beam lines close (found this way, two bays
+        # meeting at one corner stay two - NIFT 4th floor S2 and the bay below-right); a region
+        # reaching the edge of the 30 m window round the mark is not closed: no bay
+        walls_ = unary_union(lines).buffer(5.0)
+        faces = []
+        for c in open_caps:
+            pt = Point(*c.geometry["at"][:2])
+            if any(f.contains(pt) for f in faces) or walls_.contains(pt):
+                continue
+            window = pt.buffer(30000.0)
+            rest = window.difference(walls_)
+            comp = next((g for g in getattr(rest, "geoms", [rest]) if g.contains(pt)), None)
+            if comp is None or comp.exterior.distance(window.exterior) < 1.0:
+                continue
+            faces.append(Polygon(comp.exterior).buffer(5.0, join_style=2))
+        for poly in faces:
+            inside = [c for c in open_caps if poly.contains(Point(*c.geometry["at"][:2]))]
+            marks = sorted({_key_of(c.mark) for c in inside})
+            if len(marks) != 1 or poly.area < 1.0e6:
+                continue                                  # unmarked, or two marks: not guessed
+            if taken is not None and poly.intersection(taken).area > 0.1 * poly.area:
+                continue                                  # a slab already over part of it
+            mark = inside[0].mark
+            ev = Evidence(reader=READER, sheet=sid, source="beam bay with a slab mark, no slab drawn",
+                          at=list(inside[0].geometry["at"][:2]), text=f"{mark} in a {poly.area / 1e6:.1f} m2 bay")
+            # its thickness: a settled slab of that mark on this floor, else the slab schedule
+            th = next((e.resolved["thickness"] for _p, e in slabs if _key_of(str(e.final("mark") or e.mark or "")) == marks[0]
+                       and e.resolved.get("thickness") is not None and e.resolved["thickness"].status in (READ, OVERRIDE)
+                       and e.resolved["thickness"].value), None)
+            if th is None:
+                for sp in b.of("spec"):
+                    if sp.get("family") == "slab" and _key_of(sp.mark or "") == marks[0] and sp.get("thickness") \
+                            and (not _set_of(b, sp) or _set_of(b, sp) == s.extra.get("set", "")):
+                        th = sp.props["thickness"]
+                        break
+            el = Element(id=f"{sid}/slab/b{made}", type="slab", sheet=sid, level=s.level, wing=s.wing, mark=mark,
+                         geometry={"outline": [[round(x, 1), round(y, 1)] for x, y in list(poly.exterior.coords)[:-1]],
+                                   "holes": []},
+                         props={"mark": Value(mark, READ, 0.8, [ev])}, extra={"generated": True, "_layer": ""})
+            el.resolved["mark"] = Value(mark, READ, 0.8, [ev])
+            el.resolved["thickness"] = (Value(th.value, READ, min(th.confidence, 0.85), [ev] + th.evidence[:2])
+                                        if th is not None else Value(None, MISSING, 0.0, []))
+            b.add(el)
+            taken = poly if taken is None else unary_union([taken, poly])
+            made += 1
+        if made:
+            b.issues.append(Issue(INFO, "slabs", f"{made} bay(s) closed by beams, with a slab mark and no slab drawn: "
+                                  "built as that slab", sheet=sid, extra={"from_linker": True}))
+            stats["slab panels from marked bays the plan reader left empty"] += made
+
+
+TICK_MAX_MM = 600.0          # a line no longer than this can lie wholly along one column's face
+TICK_REACH_MM = 150.0        # ... within this of the column's outline, all along
+
+
+def _column_ticks(b: Building, stats) -> None:
+    """A short single line on the beam layer, lying wholly along a column's face, is part of
+    how the column (or the slab edge round it) is drawn - not a beam.
+
+    NIFT 5th floor: 300 mm lines 100 mm outside the 300 x 900 columns at the ends of the edge
+    beams - one line each (no second face, no width of its own), built as 300 x 600 beams 300
+    long, some given the mark of a caption nearby. A beam spans support to support: a line no
+    longer than TICK_MAX_MM within TICK_REACH_MM of one column all along is not one. A pair of
+    faces (a width of its own) is never touched; a review decision on it still builds it."""
+    from shapely.geometry import LineString, Polygon
+    for e in b.elements:
+        e.extra.pop("not_a_beam", None)
+    cols = defaultdict(list)
+    for e in b.elements:
+        o = e.geometry.get("outline") or []
+        if e.type == "column" and len(o) >= 3:
+            try:
+                cols[e.sheet].append((Polygon([tuple(p[:2]) for p in o]).buffer(TICK_REACH_MM), e))
+            except Exception:
+                continue
+    flagged = defaultdict(list)
+    for e in b.elements:
+        if e.type != "beam" or gone(e) or e.sheet not in cols or not e.geometry.get("start") or e.geometry.get("mid"):
+            continue
+        if e.get("width") and not any("plain line" in str(n) for n in e.notes):
+            continue                                     # two faces drawn: a beam's width
+        p, q = e.geometry["start"][:2], e.geometry["end"][:2]
+        L = math.dist(p, q)
+        if L > TICK_MAX_MM or L <= 0:
+            continue
+        ls = LineString([tuple(p), tuple(q)])
+        col = next((c for poly, c in cols[e.sheet] if poly.contains(ls)), None)
+        if col is not None:
+            e.extra["not_a_beam"] = (f"a {L:.0f} mm single line wholly along column "
+                                     f"{col.final('mark') or ''} - part of how the column is drawn, not a beam").replace("  ", " ")
+            flagged[e.sheet].append(e)
+    ids = {e.id for els in flagged.values() for e in els}
+    b.issues = [i for i in b.issues if not (i.category == "missing" and len(i.elements) == 1 and i.elements[0] in ids)]
+    for sid, els in flagged.items():
+        b.issues.append(Issue(INFO, "geometry", f"{len(els)} short single line(s) on the beam layer lie wholly along a "
+                              f"column's face (no longer than {TICK_MAX_MM:.0f} mm): part of the column's drawing, "
+                              "not beams - not built", sheet=sid, elements=[e.id for e in els], extra={"from_linker": True}))
+        stats["short lines along a column, not built as beams"] += len(els)
+
+
+def _sized_by_sketch(hit, sec, out, beams=(), cut=None) -> None:
+    """A section drawn with loose lines (beam_sections._sketch_sections, NIFT) gives the beams
+    its cut crosses their size - only what nothing else gives them. Never a shape: a plain
+    beam stays a Revit beam. A depth the section writes is read; one only measured at its
+    drawing's scale (the beam hangs under a dimensioned slab) is the working size, open
+    until decided. A beam not as wide as the section's full-height part is not the beam the
+    section shows (D-D, 230 wide, across 300 wide 2B7): left as it is, and said. The slab
+    the section draws beside the beam, read on the plan as beams, is that slab (_slab_strips)."""
+    W, D = float(sec.extra.get("full_width") or sec.get("width")), float(sec.get("depth"))
+    loose = sec.extra.get("undimensioned") or []
+    name = f"{sec.mark}-{sec.mark}"
+    ref = _cut_line(hit, beams, cut, W) if cut is not None else None
+    strips = _slab_strips(hit, beams, sec, ref)
+    th = sec.extra.get("slab_thickness") or {}
+    for e, f, shift in strips.values():
+        ev = Evidence(reader=READER, sheet=sec.sheet, source=f"section {name}: the slab running {f['width']:.0f} "
+                      f"past the beam's face, {th['mm']:.0f} thick", text=sec.extra.get("title", ""))
+        # shift: across the line (to its left, mm) from where it is drawn to the strip's middle
+        e.extra["slab_strip"] = {"section": name, "width": f["width"], "thickness": th["mm"],
+                                 "written": bool(th.get("written")), "shift": round(shift, 1)}
+        e.resolved["kind"] = Value("slab edge strip", READ, 0.85, [ev])
+        dv = e.resolved.get("depth")
+        if dv is not None and dv.status == MISSING and dv.value is not None:
+            e.resolved["depth"] = Value(None, MISSING, 0.0, [])     # not a beam: no working depth
+        out["strip"].append(e)
+    _section_faces(hit, beams, sec, strips, out, ref)
+    for e in hit:
+        if e.id in strips or e.extra.get("section_parts") or e.extra.get("same_beam_as"):
+            continue
+        wv = e.resolved.get("width")
+        w = wv.value if wv is not None and wv.status in (READ, OVERRIDE) and wv.value else e.get("width")
+        if w and abs(float(w) - W) > 15.0:
+            out["other width"].append((e, float(w)))
+            continue
+        dv = e.resolved.get("depth")
+        if dv is not None and dv.status == MISSING and dv.value not in (None, ""):
+            continue                                  # another cut of a section has sized it already
+        if dv is None or dv.status == MISSING or dv.value in (None, ""):
+            if "up" in loose:
+                ev = Evidence(reader=READER, sheet=sec.sheet, source=f"section {name}, measured at its drawing's "
+                              f"scale (its depth is not written): {D:.0f}", text=sec.extra.get("title", ""))
+                e.resolved["depth"] = Value(D, MISSING, 0.3, [ev] + (dv.evidence if dv else []))
+                out["measured"].append(e)
+            else:
+                ev = Evidence(reader=READER, sheet=sec.sheet, source=f"section {name}: {D:.0f}",
+                              text=sec.extra.get("title", ""))
+                e.resolved["depth"] = Value(D, READ, 0.85, [ev])
+                out["read"].append(e)
+        elif "up" not in loose and dv.status in (READ, OVERRIDE) and abs(float(dv.value) - D) > 25.0:
+            out["other depth"].append((e, float(dv.value)))
+        else:
+            out["agrees"].append(e)
+        if (wv is None or wv.status == MISSING or not wv.value) and "across" not in loose:
+            e.resolved["width"] = Value(W, READ, 0.85, [Evidence(reader=READER, sheet=sec.sheet,
+                                                                 source=f"section {name}: {W:.0f} wide")])
+    out["section"] = [sec]
+    return ref
+
+
+def _edge_strips(b: Building, view: str, ref, sec, beams, out) -> None:
+    """The slab beside a beam along its whole drawn edge, not only where the plan reader paired it.
+
+    NIFT 3rd floor, 3B4: the slab's outer edge is ONE line 60 m long, 300 off the beam's centre
+    (SECTION A-A: the slab 150 past the outer face); the beam's faces are 12 pieces. The reader
+    paired that line with one piece only, so the strip stopped half way. Read from the plan's own
+    beam-layer lines (readers/linework): a line where the section puts a slab edge (a closed one),
+    along the beam line the cut marks - the strip runs as far as both run. Stretches a strip
+    already covers are left as they are; nothing where no edge line is drawn."""
+    flanges = [f for f in sec.extra.get("flanges") or [] if f.get("closed")]
+    th = sec.extra.get("slab_thickness")
+    vs = b.sheets.get(view)
+    lines = ((vs.extra.get("beam_lines") or {}).get("lines") or []) if vs else []
+    if not flanges or not th or not lines:
+        return
+    W = float(sec.extra.get("full_width") or sec.get("width"))
+    (px, py), (qx, qy) = ref.geometry["start"][:2], ref.geometry["end"][:2]
+    L = math.hypot(qx - px, qy - py) or 1.0
+    ux, uy = (qx - px) / L, (qy - py) / L
+
+    def frame(x, y):                                    # (along, across to the left) on ref's line
+        return (x - px) * ux + (y - py) * uy, (x - px) * -uy + (y - py) * ux
+    # where the beam line stands: its beams, and the beam parts of split pairs; a column's
+    # width between two of them is the line carrying on
+    spans = []
+    for e in beams:
+        o = _offset(ref, e)
+        if o is None:
+            continue
+        sp = e.extra.get("section_parts") or {}
+        if (abs(o) <= W / 3.0 and abs(_drawn_width(e) - W) <= 15.0 and not e.extra.get("slab_strip")) or sp.get("beam"):
+            spans.append(_along(ref, e))
+    # ... and the beams built where only its strips were paired (_beam_line_gaps), and wherever
+    # both its faces are drawn (NIFT 5th floor: the faces drawn, the reader paired them otherwise)
+    for g in out.get("gap_beams") or []:
+        spans.append(tuple(sorted((frame(*g["start"][:2])[0], frame(*g["end"][:2])[0]))))
+    faces = {1.0: [], -1.0: []}
+    for _lay, x0, y0, x1, y1, _dash in lines:
+        (a0, o0), (a1, o1) = frame(x0, y0), frame(x1, y1)
+        if abs(a1 - a0) >= 1.0 and abs(o1 - o0) <= 0.02 * abs(a1 - a0):
+            for side in (1.0, -1.0):
+                if abs((o0 + o1) / 2.0 - side * W / 2.0) <= 40.0:
+                    faces[side].append(tuple(sorted((a0, a1))))
+    spans += [(max(a, c), min(z, d)) for a, z in _union(faces[1.0]) for c, d in _union(faces[-1.0])
+              if min(z, d) - max(a, c) > 0]
+    line = []
+    for a, z in sorted(spans):
+        if line and a <= line[-1][1] + 1000.0:
+            line[-1][1] = max(line[-1][1], z)
+        else:
+            line.append([a, z])
+    if not line:
+        return
+    name = f"{sec.mark}-{sec.mark}"
+    for f in flanges:
+        for side in (1.0, -1.0):
+            edge_at, mid = side * (W / 2.0 + f["width"]), side * (W / 2.0 + f["width"] / 2.0)
+            edges = []
+            for _lay, x0, y0, x1, y1, _dash in lines:
+                (a0, o0), (a1, o1) = frame(x0, y0), frame(x1, y1)
+                if abs(a1 - a0) < 1.0 or abs(o1 - o0) > 0.02 * abs(a1 - a0):
+                    continue                            # not along the beam
+                if abs((o0 + o1) / 2.0 - edge_at) <= 40.0:
+                    edges.append(tuple(sorted((a0, a1))))
+            if not edges:
+                continue
+            covered = []                                # strips already there, this side and width
+            for e in beams:
+                s = e.extra.get("slab_strip")
+                o = _offset(ref, e)
+                if s and o is not None:
+                    o += float(s.get("shift") or 0.0) * (1.0 if _dir_same(ref, e) else -1.0)
+                    if abs(o - mid) <= 40.0:
+                        covered.append(_along(ref, e))
+                for part in (e.extra.get("section_parts") or {}).get("strips") or []:
+                    o = _offset(ref, e)
+                    if o is not None:
+                        o += float(part["shift"]) * (1.0 if _dir_same(ref, e) else -1.0)
+                        if abs(o - mid) <= 40.0:
+                            covered.append(_along(ref, e))
+            for ea, ez in _union(edges):
+                for la, lz in line:
+                    a, z = max(ea, la), min(ez, lz)
+                    if z - a <= 2.0 * W:
+                        continue
+                    for ga, gz in _uncovered((a, z), _union(covered)):
+                        if gz - ga <= 2.0 * W:
+                            continue
+                        h = f["width"] / 2.0
+                        pts = [(ga, mid - h), (gz, mid - h), (gz, mid + h), (ga, mid + h)]
+                        out["edge_strips"].append({
+                            "outline": [[px + ux * t - uy * o, py + uy * t + ux * o] for t, o in pts],
+                            "width": f["width"], "thickness": th["mm"], "written": bool(th.get("written")),
+                            "section": name})
+
+
+def _uncovered(span, covered) -> list:
+    """The parts of a stretch (from, to) that no stretch in covered (joined) lies over."""
+    a, z = span
+    out, at = [], a
+    for c0, c1 in covered:
+        if c1 <= at or c0 >= z:
+            continue
+        if c0 > at:
+            out.append((at, c0))
+        at = max(at, c1)
+    if at < z:
+        out.append((at, z))
+    return out
+
+
+def _sketch_issues(b: Building, sketched, stats) -> None:
+    """One line per section and plan saying what the section gave its beams."""
+    strip_ids = {e.id for got in sketched.values() for e in got["strip"] + got["twice"]} | \
+        {e.id for got in sketched.values() for e in got["merged"] if not e.extra["section_parts"].get("beam")}
+    # a slab strip, or a beam drawn twice, is not a beam missing its depth
+    b.issues = [i for i in b.issues if not (i.category == "missing" and len(i.elements) == 1
+                                            and i.elements[0] in strip_ids and "depth" in i.message)]
+    for (sid, _), got in sketched.items():
+        sec = got["section"][0]
+        name = f"{sec.mark}-{sec.mark}"
+        if got["edge_strips"] and sid in b.sheets:
+            from shapely.geometry import Polygon
+            from shapely.ops import unary_union
+            have = b.sheets[sid].extra.setdefault("section_edge_strips", [])
+            added = 0.0
+            for g in got["edge_strips"]:
+                # another cut of the same line gives (nearly) the same strip: only what is new
+                poly = Polygon(g["outline"])
+                if have:
+                    poly = poly.difference(unary_union([Polygon(h["outline"]).buffer(20.0) for h in have]))
+                for piece in getattr(poly, "geoms", [poly]):
+                    if piece.is_empty or piece.area < 2.0 * g["width"] * g["width"]:
+                        continue
+                    have.append(dict(g, outline=[[round(x, 1), round(y, 1)] for x, y in list(piece.exterior.coords)[:-1]]))
+                    added += piece.area / g["width"]
+            if added:
+                b.issues.append(Issue(INFO, "section", f"section {name}: the slab's edge is drawn along the beam line "
+                                      f"for {added / 1000.0:.1f} m more than the plan reader paired it - the slab strip "
+                                      "built along it there too", sheet=sid, mark=name, extra={"from_linker": True}))
+                stats["metres of slab strip built along a drawn slab edge"] += round(added / 1000.0)
+        if got["gap_beams"] and sid in b.sheets:
+            have = b.sheets[sid].extra.setdefault("section_gap_beams", [])
+            seen = {(round(g["start"][0]), round(g["start"][1]), round(g["end"][0]), round(g["end"][1])) for g in have}
+            for g in got["gap_beams"]:
+                k = (round(g["start"][0]), round(g["start"][1]), round(g["end"][0]), round(g["end"][1]))
+                if k not in seen:
+                    seen.add(k)
+                    have.append(g)
+                    b.issues.append(Issue(INFO, "section", f"beam {g['mark']}: {math.dist(g['start'], g['end']):.0f} mm "
+                                          f"{'between two of its spans' if len(g['between']) > 1 else 'past its last span'} has only its slab strips drawn as pairs (section "
+                                          f"{name}): the strips' inner edges are its faces - built there, "
+                                          f"{g['width']:.0f} x {g['depth']:.0f}", sheet=sid, elements=list(g["between"]),
+                                          mark=str(g["mark"]), extra={"from_linker": True}))
+                    stats["beams built where only their slab strips were paired"] += 1
+        W, D = float(sec.extra.get("full_width") or sec.get("width")), float(sec.get("depth"))
+        size = f"{W:.0f} x {D:.0f}" + (" with a ledge or step, built as a plain beam" if not sec.extra.get("rectangle") else "")
+        how = " (depth measured at the drawing's scale - only the slab is dimensioned)" if "up" in (
+            sec.extra.get("undimensioned") or []) else ""
+        parts = []
+        strips = list({e.id: e for e in got["strip"]}.values())
+        if strips:
+            ws = sorted({f"{e.extra['slab_strip']['width']:.0f}" for e in strips})
+            parts.append(f"{len(strips)} line(s) along it read as beams {' / '.join(ws)} wide are the slab the "
+                         f"section draws beside the beam ({sec.extra['slab_thickness']['mm']:.0f} thick) - built as "
+                         "slab, not as beams")
+        if got["read"]:
+            parts.append(f"{len(got['read'])} beam(s) with no depth from any other source take {D:.0f}")
+        if got["measured"]:
+            parts.append(f"{len(got['measured'])} beam(s) with no depth are built {D:.0f} deep, red until you "
+                         "confirm or type the depth")
+        if got["agrees"]:
+            parts.append(f"{len(got['agrees'])} already sized")
+        if got["other depth"]:
+            parts.append(", ".join(f"{e.final('mark') or 'a beam'} is {d:.0f} deep from its own source (kept)"
+                                   for e, d in got["other depth"][:5]))
+        if got["other width"]:
+            parts.append(", ".join(f"{e.final('mark') or 'a beam'} is {w:.0f} wide, not this section's beam (left as it is)"
+                                   for e, w in got["other width"][:5]))
+        els = [e.id for k in ("read", "measured", "agrees") for e in got[k]] + \
+              [e.id for k in ("other depth", "other width") for e, _ in got[k]] + [e.id for e in strips]
+        sev = WARNING if got["measured"] or got["other depth"] or got["other width"] else INFO
+        b.issues.append(Issue(sev, "section", f"section {name} ({size}{how}) is marked across "
+                              f"{len(els)} beam(s): " + "; ".join(parts), sheet=sid, elements=els,
+                              mark=name, extra={"from_linker": True}))
+        stats["beams sized from a section drawn with lines"] += len(got["read"])
+        stats["beams given a working depth measured from a section"] += len(got["measured"])
+        stats["lines read as beams that a section shows as slab"] += len(strips)
 
 
 def _unit(e):
@@ -1855,6 +3048,846 @@ def _legend_zones(b: Building, stats) -> None:
             continue                       # read by the plan reader itself
         b.issues.append(Issue(INFO, "legend", f"legend row 'THUS MARKED {r.extra.get('words', '')}': no area on "
                               "this plan is drawn with its sample", sheet=r.sheet, extra={"from_linker": True}))
+
+
+def _schedule_ranges(b: Building) -> dict[str, dict[str, list]]:
+    """set -> mark -> [level range] in which the column schedule draws that column.
+    From the schedule sheets' own record (column_schedule.read: unsized sections count,
+    'no section in a band' does not), and from the sized specs."""
+    out: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+    for sid, s in b.sheets.items():
+        for row in s.extra.get("column_schedule") or []:
+            if row.get("size") is not None and row.get("range"):
+                out[s.extra.get("set", "")][row["mark"]].append(tuple(row["range"]))
+    for s in b.of("spec"):
+        rng = s.extra.get("level_range")
+        if rng and s.mark and s.get("family") == "column" and tuple(rng) not in out[_set_of(b, s)][s.mark]:
+            out[_set_of(b, s)][s.mark].append(tuple(rng))
+    return out
+
+
+def _run_top(ranges: list, rank: float) -> str | None:
+    """The level the column standing at `rank` runs up to: its range, then each range
+    starting where the last one ends (FDN-GF, GF-L1, L1-TERRACE: TERRACE)."""
+    cur = next((r for r in ranges if _in_range_rank(rank, r)), None)
+    if cur is None:
+        return None
+    top, seen = cur[1], {cur}
+    while True:
+        nxt = next((r for r in ranges if r not in seen and r[0] == top and level_rank(r[1]) is not None
+                    and level_rank(r[1]) > level_rank(top)), None)
+        if nxt is None:
+            return top
+        seen.add(nxt)
+        top = nxt[1]
+
+
+def _in_range_rank(rank: float, rng) -> bool:
+    """column_schedule.in_range, for a level already ranked."""
+    lo, hi = level_rank(rng[0]), level_rank(rng[1])
+    if lo is None or hi is None:
+        return False
+    return rank == lo if lo == hi else lo < rank <= hi
+
+
+def _column_extent(b: Building, stats) -> None:
+    """How far each plan column runs, from the column schedule's level ranges.
+
+    A plan shows the columns standing under its slab (column_schedule.in_range), and
+    those are built from the level below up to it. The schedule says where that is not so:
+
+      * the schedule's column STARTS at this plan's level (C9 'L1 TO L2' on the L1 plan):
+        it sits on this floor and rises to the next, like a floating column - built so,
+        unless the plan above draws it too (then that plan builds it; said, for the review);
+      * the schedule has no such column at this level: the mark, or the drawing, is to check;
+      * the schedule's column runs on above the highest plan imported (C1 to ROOF, no ROOF
+        plan): nothing above that plan is built - said once per plan.
+    A column marked FC is left as it is; so is one whose kind was decided in the review,
+    and one excluded there. Runs after apply_overrides, so marks decided there are used.
+    """
+    for e in b.elements:
+        e.extra.pop("schedule_extent", None)
+    sched = _schedule_ranges(b)
+    if not any(sched.values()):
+        return
+    plans: dict[str, list] = defaultdict(list)            # set -> [(rank, sheet id)]
+    for sid, s in b.sheets.items():
+        r = level_rank(s.extra.get("level_key") or "")
+        if s.reader == "plan.legacy" and r is not None:
+            plans[s.extra.get("set", "")].append((r, sid))
+    cols = [e for e in b.elements if e.type == "column" and e.sheet in b.sheets
+            and b.sheets[e.sheet].reader == "plan.legacy" and not gone(e) and not _not_built(e)]
+    warned = {eid for i in b.issues if i.category == "column mark" for eid in i.elements}
+    by_mark: dict[tuple, list] = defaultdict(list)          # (set, mark) -> [(rank, column)]
+    for e in cols:
+        r = level_rank(_level_key(b, e))
+        if r is not None:
+            by_mark[(_set_of(b, e), _key_of(str(e.final("mark") or e.mark or "")))].append((r, e))
+    above_open: dict[str, list] = defaultdict(list)       # sheet -> ["C1 (to ROOF)"]
+    for e in cols:
+        mark = str(e.final("mark") or e.mark or "")
+        lv = _level_key(b, e)
+        r = level_rank(lv)
+        my_set = _set_of(b, e)
+        # a schedule with no drawing set applies to every set, as the sizes do
+        ranges = sched.get(my_set, {}).get(mark) or (sched.get("", {}).get(mark) if my_set else None)
+        if not mark or r is None or not ranges or _key_of(mark).startswith("FC") \
+                or e.get("kind") == "column_float" or "kind" in e.resolved:
+            continue
+        known = [g for g in ranges if level_rank(g[0]) is not None and level_rank(g[1]) is not None]
+        if not known:
+            continue
+        text = ", ".join(f"{g[0]} to {g[1]}" for g in sorted(known, key=lambda g: level_rank(g[0])))
+        ev = Evidence(reader=READER, sheet=e.sheet, source="column schedule level ranges", text=f"{mark}: {text}")
+        top = _run_top(known, r)
+        if top is not None:
+            e.extra["schedule_extent"] = top
+            higher = [p for p, sid in plans.get(my_set, []) if r < p <= level_rank(top)]
+            if level_rank(top) > r and not higher:
+                above_open[e.sheet].append(f"{mark} (to {top})")
+            continue
+        starts = [g for g in known if level_rank(g[0]) == r and level_rank(g[1]) > r]
+        if starts:
+            hi = max(level_rank(g[1]) for g in starts)
+            upper = [c for p, c in by_mark.get((my_set, _key_of(mark)), []) if r < p <= hi and c is not e
+                     and _same_column(e, c)]
+            if upper:
+                b.issues.append(Issue(WARNING, "column extent", f"column {mark}: the column schedule starts it at "
+                                      f"{lv} ({text}), and the plan above draws it too - that plan builds it from "
+                                      f"{lv} up; this one would stand below {lv}: exclude it in the review",
+                                      sheet=e.sheet, elements=[e.id, upper[0].id], mark=mark,
+                                      extra={"from_linker": True}))
+                stats["columns the schedule starts here, drawn above too"] += 1
+                continue
+            e.resolved["kind"] = Value("column_float", READ, 0.85, [ev])
+            b.issues.append(Issue(INFO, "column extent", f"column {mark}: the column schedule starts it at {lv} "
+                                  f"({text}) - built from {lv} up to the next level, like a floating column",
+                                  sheet=e.sheet, elements=[e.id], mark=mark, extra={"from_linker": True}))
+            stats["columns the schedule starts at their plan's level (built upward)"] += 1
+            continue
+        if e.id not in warned:
+            b.issues.append(Issue(WARNING, "column extent", f"column {mark}: the column schedule has no {mark} at "
+                                  f"{lv} ({text}) - check the mark, or which floor this plan is",
+                                  sheet=e.sheet, elements=[e.id], mark=mark, extra={"from_linker": True}))
+            stats["columns the schedule has not at their plan's level"] += 1
+    for e in cols:
+        if (e.extra.get("legend") or "").startswith("RCC column through"):
+            r = level_rank(_level_key(b, e))
+            if r is not None and not any(p > r for p, _ in plans.get(_set_of(b, e), [])):
+                above_open[e.sheet].append(f"{e.final('mark') or e.mark or 'unmarked'} (legend: column through)")
+    for sid, items in above_open.items():
+        lv = b.sheets[sid].extra.get("level_key") or sid
+        uniq = sorted(set(items))
+        b.issues.append(Issue(WARNING, "column extent", f"{len(items)} column(s) run on above {lv} - "
+                              f"{', '.join(uniq[:12])}{' ...' if len(uniq) > 12 else ''} - but no plan above {lv} "
+                              f"was imported: they are built up to {lv} only. Import the plan above to build them",
+                              sheet=sid, extra={"from_linker": True}))
+        stats["columns running on above the highest plan"] += len(items)
+
+
+def _same_column(a, c) -> bool:
+    """The same column on two floors: one stack (aligned to the column layout), or,
+    with no stack, within 300 mm in the drawings' own coordinates."""
+    sa, sc = a.extra.get("stack"), c.extra.get("stack")
+    if sa and sc:
+        return sa == sc
+    ga, gc = a.geometry, c.geometry
+    if ga.get("x") is None or gc.get("x") is None:
+        return False
+    return math.hypot(ga["x"] - gc["x"], ga["y"] - gc["y"]) <= 300.0
+
+
+def _not_built(e) -> bool:
+    """Excluded in the review, or left out as another block's (export.left_out)."""
+    if e.resolved.get("excluded") and e.resolved["excluded"].value:
+        return True
+    v = e.resolved.get("scope")
+    return v is not None and v.status in (OVERRIDE, READ) and str(v.value or "").lower().startswith("other")
+
+
+ELEV_TOL_MM = 300.0     # a wall ending this near a level line ends at it (its slab, a beam)
+WALL_ELEV = "wall elevation"
+
+
+def _plan_floors(b: Building, set_key: str) -> list:
+    """[(rank, level key, [plan sheet ids])] of one drawing set, bottom up."""
+    by = defaultdict(list)
+    for sid, s in b.sheets.items():
+        k = s.extra.get("level_key") or ""
+        if s.reader == "plan.legacy" and s.extra.get("set", "") == set_key and level_rank(k) is not None:
+            by[k].append(sid)
+    return sorted(((level_rank(k), k, sorted(v)) for k, v in by.items()), key=lambda t: (t[0], t[1]))
+
+
+def _match_levels(we: dict, keys: list, heights: dict) -> tuple:
+    """Each level line of a wall elevation (bottom up) -> the floor (level key) it is, or None.
+    One to one with the set's plan floors in order when there are as many - and where the
+    floors' elevations are known (read or decided) and the elevation's scale is, its storey
+    heights must agree. When the counts differ, by the floors' elevations alone.
+    Returns (keys or None, how - or why not)."""
+    lv, scale = we["levels"], we.get("scale")
+    known = bool(scale) and all(heights.get(k) is not None for k in keys)
+    if len(lv) == len(keys):
+        if known:
+            bad = [f"{keys[i]} to {keys[i + 1]}" for i in range(len(keys) - 1)
+                   if abs((lv[i + 1]["y"] - lv[i]["y"]) / scale - (heights[keys[i + 1]] - heights[keys[i]])) > 50.0]
+            if bad:
+                return None, f"its storey heights differ from the floors' ({', '.join(bad)})"
+            return list(keys), "one to one with the floors, in order; the storey heights agree"
+        return list(keys), "one to one with the floors, in order"
+    if scale and sum(1 for k in keys if heights.get(k) is not None) >= 2:
+        for l0 in lv:
+            for k0 in keys:
+                if heights.get(k0) is None:
+                    continue
+                got = []
+                for l in lv:
+                    z = heights[k0] + (l["y"] - l0["y"]) / scale
+                    got.append(next((k for k in keys if heights.get(k) is not None and abs(heights[k] - z) <= 50.0),
+                                    None))
+                hit = [g for g in got if g]
+                if len(hit) >= max(2, len(lv) - 1) and len(set(hit)) == len(hit):
+                    return got, "by the floors' elevations"
+    return None, f"{len(lv)} level lines for {len(keys)} floors, and no floor elevations to match them by"
+
+
+def _band_extent(ys: list, i: int, base: float, top: float, scale) -> tuple:
+    """What a wall standing from base to top (drawing units) is of floor i's storey - from
+    floor i-1's level line to floor i's (ys, None where the elevation has no such line):
+    'below' (it starts at or above floor i), 'above' (it ended by floor i-1), 'in' with its
+    base / top off those levels in mm where it starts or ends between them, or '' (the
+    elevation does not show floor i)."""
+    tol = ELEV_TOL_MM * (scale or 1.0)
+    hi = ys[i]
+    lo = ys[i - 1] if i > 0 else None
+    if hi is None:
+        return "", {}
+    if base >= hi - tol:
+        return "below", {}
+    if lo is not None and top <= lo + tol:
+        return "above", {}
+    got = {}
+    if scale and lo is not None and base > lo + tol:
+        got["base_mm"] = round((base - lo) / scale)
+    if scale and top < hi - tol:
+        got["top_mm"] = -round((hi - top) / scale)
+    return "in", got
+
+
+def _wall_heights(b: Building, stats, overrides: dict | None = None) -> None:
+    """Walls drawn in elevation (readers/wall_elevations.py): where each wall - and what
+    stands on the raft under it - starts and ends, floor by floor.
+
+    A plan shows the columns and walls under its slab, built from the level below up to
+    it. A wall elevation says where that is not so (Winter Villa, SHEAR WALL ELEVATION
+    (SW15): SW15 stands on its raft 1325 above the lowest level line - the site slopes):
+      * its level lines are matched to the plan floors (_match_levels);
+      * a plan's wall of that mark whose storey lies under the wall's base, or over its top,
+        is not built (scope read 'other', as a legend sample beside a plan: 'this block' in
+        the review builds it); one that starts or ends inside its storey gets base_mm /
+        top_mm, its base above the level below / its top off its level, in mm;
+      * the raft drawn under the wall's base, found on the foundation plan by the wall's
+        mark, has its top there: every other column and wall standing on that raft starts
+        at it the same way (the plans placed on the foundation plan by column marks).
+    Elements decided in the review (scope, excluded) and ones already given a scope are
+    left as they are; a top from a building section wins. Runs after apply_overrides.
+    """
+    for e in b.elements:
+        e.extra.pop("profile_wall", None)
+        e.extra.pop("lean", None)
+        wh = e.extra.pop("wall_height", None)
+        for k in (wh or {}).get("set", []):
+            v = e.resolved.get(k)
+            if v is not None and v.status == READ and any(ev.reader == READER and ev.source.startswith(WALL_ELEV)
+                                                          for ev in v.evidence):
+                del e.resolved[k]
+    elevs = [(sid, s.extra["wall_elevation"]) for sid, s in b.sheets.items() if s.extra.get("wall_elevation")]
+    if not elevs:
+        return
+    from .export import _shift_by_marks, level_table
+    heights: dict[str, dict] = defaultdict(dict)
+    for row in level_table(b, (overrides or {}).get("project")):
+        if row.get("elevation_mm") is not None and row.get("level"):
+            heights[row.get("set") or ""][row["level"]] = float(row["elevation_mm"])
+    by_set = defaultdict(list)
+    for sid, we in elevs:
+        by_set[b.sheets[sid].extra.get("set", "")].append((sid, we))
+    by_id = {e.id: e for e in b.elements}
+    for set_key, items in by_set.items():
+        floors = _plan_floors(b, set_key)
+        if len(floors) < 2:
+            continue
+        keys = [k for _r, k, _s in floors]
+        floor_of = {sid: i for i, (_r, _k, sids) in enumerate(floors) for sid in sids}
+        name_of = {k: b.sheets[sids[0]].level or k for _r, k, sids in floors}    # "Service Floor", not its key
+        verticals = [e for e in b.elements if e.type in ("column", "wall") and e.sheet in floor_of
+                     and not gone(e) and "scope" not in e.resolved
+                     and not (e.resolved.get("excluded") and e.resolved["excluded"].value)]
+        done: dict[str, tuple] = {}            # element id -> (kind, {base_mm, top_mm}, why, elevation sheet)
+        raft_tops = defaultdict(list)          # raft id -> [(ys, scale, top y, sheet, why, drawn thickness)]
+        drawn = set()
+        shifts = None                          # each plan's offset onto the lowest (viewer3d.stack), when needed
+        for sid, we in items:
+            title = we.get("title") or sid
+            got_keys, how = _match_levels(we, keys, heights.get(set_key, {}))
+            if got_keys is None:
+                b.issues.append(Issue(INFO, WALL_ELEV, f"{title}: its levels could not be matched to the floors ({how}) "
+                                      "- nothing taken from it", sheet=sid, extra={"from_linker": True}))
+                continue
+            scale = we.get("scale")
+            ys = [next((lv["y"] for lv, k in zip(we["levels"], got_keys) if k == key), None) for key in keys]
+            tol = ELEV_TOL_MM * (scale or 1.0)
+
+            def where(y, we=we, got_keys=got_keys, scale=scale, tol=tol):
+                lv, k = min(((lv, k) for lv, k in zip(we["levels"], got_keys) if k), key=lambda t: abs(t[0]["y"] - y))
+                name = f"LEVEL {lv['name']} ({name_of[k]})" if lv["name"] else name_of[k]
+                return name if abs(y - lv["y"]) <= tol or not scale else f"{(y - lv['y']) / scale:+.0f} mm from {name}"
+            said = []
+            # a mark no plan carries, mistyped (SA14 beside SW13, SW15): the one plan column or
+            # wall of its first letter and number, not named by the elevation already
+            on_plans = {_key_of(str(e.final("mark") or e.mark or "")) for e in verticals}
+            named = {_key_of(m) for w in we["walls"] for m in w["marks"]}
+            typo = {}
+            for k in sorted(named - on_plans):
+                p = re.match(r"([A-Z])[A-Z]*(\d+)$", k)
+                cand = sorted(o for o in on_plans - named if p and re.fullmatch(
+                    re.escape(p.group(1)) + r"[A-Z]*0*" + p.group(2), o))
+                if len(cand) == 1:
+                    typo[k] = cand[0]
+                    b.issues.append(Issue(INFO, WALL_ELEV, f"{title}: names {k}, which no plan carries - read as "
+                                          f"{cand[0]}, the one plan mark of its letter and number; correct the "
+                                          "title if not", sheet=sid, mark=k, extra={"from_linker": True}))
+            plane = {}                         # which way the elevation's +x runs on the plans (a wall built to it)
+            later = []                         # (wall drawn, mark, storeys) leaning as the section draws them
+
+            def shaped(mark, fi, how, sid=sid, title=title):
+                lo_k, hi_k = keys[fi - 1], keys[fi]
+                b.issues.append(Issue(INFO, WALL_ELEV, f"{mark}: {title} draws it changing shape between "
+                                      f"{name_of[lo_k]} and {name_of[hi_k]} (an arch, a lean) - {how}",
+                                      sheet=sid, mark=mark, extra={"from_linker": True}))
+            for w in we["walls"]:
+                mark = typo.get(_key_of(w["marks"][0]), w["marks"][0])
+                drawn.add(_key_of(mark))
+                span = f"{mark} from {where(w['base'])} to {where(w['top'])}"
+                said.append(span)
+                # an elevation says nothing below its lowest level line: a wall drawn down to it
+                # carries on below as the plans draw it (Winter Villa: SW9 / SW10 to LEVEL -01, the
+                # raft lower, at the foundation level); only a base drawn above that line is its own
+                base = w["base"] if w["base"] > we["levels"][0]["y"] + tol else -math.inf
+                # the rafts on the foundation plan under this mark
+                f = w.get("foundation")
+                under = [r for r in b.of("raft") if f and b.sheets.get(r.sheet) and not gone(r)
+                         and b.sheets[r.sheet].extra.get("set", "") == set_key
+                         and len(r.geometry.get("outline") or []) >= 3
+                         and any(_key_of(str(o.final("mark") or o.mark or "")) == _key_of(mark) and o is not r
+                                 and (c := _centre_of(o)) is not None and _inside(c, r.geometry["outline"])
+                                 for o in b.elements if o.sheet == r.sheet)]
+                if base != -math.inf and any((fv := r.resolved.get(FOUNDING)) is not None and fv.status == OVERRIDE
+                                             for r in under):
+                    # its raft's founding level decided, lower (Winter Villa: Foundation -1200): the
+                    # slab drawn under it is a floor slab, which nothing builds - it carries on down
+                    # to the raft as the plans draw it, not left standing on nothing (user 2026-10-28)
+                    base = -math.inf
+                    said[-1] += " (its raft's founding level decided: it carries on down to the raft)"
+                for e in verticals:
+                    if _key_of(str(e.final("mark") or e.mark or "")) != _key_of(mark):
+                        continue
+                    kind, got = _band_extent(ys, floor_of[e.sheet], base, w["top"], scale)
+                    if kind:
+                        done[e.id] = (kind, got, f"{title} draws {span}", sid)
+                bands = [keys.index(got_keys[j]) for j in w.get("shaped_at") or []
+                         if got_keys[j - 1] and got_keys[j]]
+                if bands:
+                    if shifts is None:
+                        from .viewer3d import stack
+                        shifts = stack(b, set_key, [(f[2][0], b.sheets[f[2][0]]) for f in floors])[0]
+                    kinds = [e.type for e in verticals if _key_of(str(e.final("mark") or e.mark or "")) == _key_of(mark)]
+                    if kinds and "wall" not in kinds:
+                        # a column the title names beside the walls (C12): it leans as they do
+                        later.append((w, mark, bands, None, ""))
+                    else:
+                        # which way the elevation faces on the plans; its shape is then the section's
+                        # alone (_section_lean, below) - a plan drawing it shifted from floor to floor
+                        # is not a lean (user 2026-10-28)
+                        why, fit = _profile_walls(b, w, mark, bands, ys, scale, keys, floor_of, verticals, shifts,
+                                                  title, plane)
+                        later.append((w, mark, bands, why, fit))
+                if not f:
+                    continue
+                said[-1] += (f", on a slab {(f['top'] - f['bottom']) / scale:.0f} thick" if scale else ", on a slab")
+                for r in under:
+                    raft_tops[r.id].append((ys, scale, f["top"], sid, f"{title} draws its top at "
+                                            f"{where(f['top'])}, under {mark}",
+                                            (f["top"] - f["bottom"]) / scale if scale else None))
+            for w, mark, bands, pwhy, pfit in later:
+                key = _key_of(mark)
+                fitted = {e.id: e.extra.pop("profile_wall") for e in verticals if "profile_wall" in e.extra
+                          and _key_of(str(e.final("mark") or e.mark or "")) == key}
+                why, fit = _section_lean(b, w, mark, bands, ys, scale, keys, floor_of, verticals, shifts, title,
+                                         plane.get("dir"))
+                for fi in bands:
+                    if not why[fi]:
+                        shaped(mark, fi, f"built leaning as drawn ({fit})")
+                        stats["columns/walls built leaning as a wall elevation draws them"] += 1
+                    elif pwhy and not pwhy[fi]:
+                        # the section cannot be started from the plan under its lean: its shape
+                        # placed on each floor's plan, as before
+                        for e in verticals:
+                            if e.id in fitted and floor_of[e.sheet] == fi:
+                                e.extra["profile_wall"] = fitted[e.id]
+                        shaped(mark, fi, f"built to that shape, a profile wall ({pfit})")
+                        stats["walls built to the shape a wall elevation draws"] += 1
+                    else:
+                        shaped(mark, fi, f"built straight up between them, as the {name_of[keys[fi]]} plan "
+                               f"draws it ({why[fi]}): shape it in Revit as drawn")
+                        stats["walls a wall elevation shapes, built straight"] += 1
+            b.issues.append(Issue(INFO, WALL_ELEV, f"{title}: its levels are the floors {how} ("
+                                  + ", ".join(f"{lv['name'] or '(unnamed)'} = {name_of[k]}" for lv, k in zip(we["levels"], got_keys)
+                                              if k) + "); " + "; ".join(said), sheet=sid, extra={"from_linker": True}))
+        # what else stands on those rafts starts on their tops
+        for rid, tops in raft_tops.items():
+            r = by_id[rid]
+            rmark = r.final("mark") or r.mark or "raft"
+
+            def floor_z(t):                      # the top as (floor index, mm above that floor's line)
+                ys, scale, y = t[0], t[1], t[2]
+                i = max((i for i, v in enumerate(ys) if v is not None and v <= y + ELEV_TOL_MM * (scale or 1.0)),
+                        default=None)
+                return (i, (y - ys[i]) / (scale or 1.0)) if i is not None else (None, 0.0)
+            zs = [floor_z(t) for t in tops]
+            if any(z[0] != zs[0][0] or abs(z[1] - zs[0][1]) > 50.0 for z in zs):
+                b.issues.append(Issue(WARNING, WALL_ELEV, f"raft {rmark}: the wall elevations draw its top at different "
+                                      f"heights ({'; '.join(t[4] for t in tops)}) - nothing taken from them",
+                                      sheet=r.sheet, elements=[rid], extra={"from_linker": True}))
+                continue
+            ys, scale, ytop, src, why, drawn_t = tops[0]
+            fv = r.resolved.get(FOUNDING)
+            if fv is not None and fv.status == OVERRIDE:
+                # its founding level decided (for it, or the Foundation height for all): the raft is
+                # there, and the slab the elevation draws under the wall is not it - nothing is
+                # started on that slab
+                b.issues.append(Issue(INFO, WALL_ELEV, f"raft {rmark}: founding level {float(fv.value):+.0f} as decided "
+                                      f"- {why} is taken as a floor slab, not this raft", sheet=r.sheet,
+                                      elements=[rid], extra={"from_linker": True}))
+                continue
+            _raft_level(b, r, zs[0], drawn_t, heights.get(set_key, {}), keys, src, why, stats)
+            for sid in sorted({e.sheet for e in verticals}):
+                shift = _shift_by_marks(b, r.sheet, sid)
+                mine = [e for e in verticals if e.sheet == sid and e.id not in done
+                        and _key_of(str(e.final("mark") or e.mark or "")) not in drawn]
+                if not mine:
+                    continue
+                kind, got = _band_extent(ys, floor_of[sid], ytop, math.inf, scale)
+                if kind != "below" and not got:
+                    continue                          # the raft's top is not in this floor's storey
+                if shift is None:
+                    b.issues.append(Issue(INFO, WALL_ELEV, f"raft {rmark}: its top is off this floor's storey "
+                                          f"({why}), but this plan could not be placed on the foundation plan "
+                                          "(too few column marks on both) - its columns and walls are built from "
+                                          "the level below as usual", sheet=sid, extra={"from_linker": True}))
+                    continue
+                (dx, dy), _n = shift
+                for e in mine:
+                    c = _centre_of(e)
+                    if c is not None and _inside((c[0] - dx, c[1] - dy), r.geometry["outline"]):
+                        done[e.id] = (kind, got, f"stands on raft {rmark}: {why}", src)
+        # applied, and said per plan
+        out, off = defaultdict(list), defaultdict(list)
+        for eid, (kind, got, why, src) in done.items():
+            e = by_id[eid]
+            ev = [Evidence(reader=READER, sheet=src, source=f"{WALL_ELEV}: {why}")]
+            mark = str(e.final("mark") or e.mark or "unmarked")
+            if kind in ("below", "above"):
+                e.resolved["scope"] = Value(f"other: {'under its base' if kind == 'below' else 'over its top'} "
+                                            f"- {why}", READ, 0.8, ev)
+                e.extra["wall_height"] = {"set": ["scope"]}
+                out[e.sheet].append((e, mark, kind, why))
+                continue
+            put = []
+            for k, v in got.items():
+                if k == "top_mm" and "top_mm" in e.resolved:
+                    continue                          # a building section's top wins
+                e.resolved[k] = Value(float(v), READ, 0.85, ev)
+                put.append(k)
+            if put:
+                e.extra["wall_height"] = {"set": put}
+                off[e.sheet].append((e, mark, ", ".join(f"{'base' if k == 'base_mm' else 'top'} {got[k]:+.0f}"
+                                                        for k in put), why))
+        for sid, rows in out.items():
+            lv = b.sheets[sid].level or b.sheets[sid].extra.get("level_key") or sid
+            marks = sorted({m for _e, m, _k, _w in rows})
+            whys = sorted({w for _e, _m, _k, w in rows})
+            b.issues.append(Issue(WARNING, "scope", f"{len(rows)} columns/walls of the {lv} plan ({', '.join(marks[:20])}"
+                                  f"{' ...' if len(marks) > 20 else ''}) lie outside the height the wall elevations "
+                                  f"give them, so they are not built: {' | '.join(whys[:4])}. Choose 'this block' "
+                                  "to build them", sheet=sid, elements=[e.id for e, *_ in rows],
+                                  extra={"from_linker": True}))
+            stats["columns/walls outside the height a wall elevation gives them (not built)"] += len(rows)
+        for sid, rows in off.items():
+            lv = b.sheets[sid].level or b.sheets[sid].extra.get("level_key") or sid
+            whys = sorted({w for *_x, w in rows})
+            b.issues.append(Issue(INFO, WALL_ELEV, f"{len(rows)} columns/walls of the {lv} plan start or end off its "
+                                  f"levels, as the wall elevations draw them: " + ", ".join(
+                                      f"{m} {t}" for _e, m, t, _w in rows[:20]) + (" ..." if len(rows) > 20 else "")
+                                  + f" mm ({' | '.join(whys[:4])})",
+                                  sheet=sid, elements=[e.id for e, *_ in rows], extra={"from_linker": True}))
+            stats["columns/walls given a base or top by a wall elevation"] += len(rows)
+
+
+def _across(poly, y) -> list:
+    """The stretches of a drawn outline cut across at height y: [(x0, x1)]."""
+    from shapely.geometry import LineString
+    x0, _y0, x1, _y1 = poly.bounds
+    cut = poly.intersection(LineString([(x0 - 1, y), (x1 + 1, y)]))
+    parts = [g for g in getattr(cut, "geoms", [cut]) if g.geom_type == "LineString" and g.length > 1]
+    return sorted((min(c[0] for c in g.coords), max(c[0] for c in g.coords)) for g in parts)
+
+
+def _profile_walls(b: Building, w: dict, mark: str, bands: list, ys: list, scale, keys: list, floor_of: dict,
+                   verticals: list, shifts: dict, title: str, plane: dict | None = None) -> tuple:
+    """A wall a wall elevation draws changing shape (SW10's arch, SW15's lean) is built to that
+    shape over those storeys (bands: floor indexes, each its storey from the floor below):
+    the elevation's outline of the wall cut to the storey, as a profile in the plan wall's
+    vertical plane - extra["profile_wall"] {section, origin, dir, thickness, points [[along, up]]},
+    mm from the origin (on the plan wall's line) and from the level below. Export / Revit / 3D /
+    IFC make it a profile wall.
+
+    The plans (moved onto each other as the 3D view does) give the wall's line, and where along
+    it the wall stands at each floor's level - a plan shows the wall under its slab, where that
+    floor's beams meet it. Which way round: the way the elevation and the plans move it from
+    floor to floor, all agreeing. The elevation is fitted to the plans over every floor; at each
+    floor's level the wall is moved onto that floor's plan, the difference spread evenly up the
+    storey, so its beams meet it and its storeys join. A floor more than 750 mm off the fit, or
+    anything unclear - floors not lined up, the mark not one straight wall, the runs not on one
+    line - leaves the wall straight.
+    plane: given, gets "dir" - the way the elevation's +x runs on the plans - once the plans and
+    the elevation agree which way round the wall stands (for _section_lean).
+    Returns ({floor index: '' (shaped) or why not}, how it was placed)."""
+    from shapely.geometry import Polygon, box
+    s_ = scale or 0.0
+
+    def no(why):
+        return {fi: why for fi in bands}, ""
+    if not s_ or len(w.get("outline") or []) < 3:
+        return no("the elevation's scale is not known")
+    poly = Polygon(w["outline"]).buffer(0)
+    key = _key_of(mark)
+    # every floor's plan wall of this mark: one straight run, lined up
+    runs = {}
+    for e in verticals:
+        if e.type == "wall" and _key_of(str(e.final("mark") or e.mark or "")) == key and len(e.extra.get("runs") or []) == 1:
+            runs.setdefault(floor_of[e.sheet], []).append(e)
+    runs = {fi: es[0] for fi, es in runs.items() if len(es) == 1 and shifts.get(es[0].sheet) is not None}
+    if any(fi not in runs for fi in bands):
+        return no(f"the plan does not draw {mark} as one straight wall on that floor, or that floor is not "
+                  "lined up with the others")
+    ref = runs[bands[0]]
+    r0, sh0 = ref.extra["runs"][0], shifts[ref.sheet]
+    p0 = (r0["start"][0] + sh0[0], r0["start"][1] + sh0[1])
+    dx, dy = r0["end"][0] - r0["start"][0], r0["end"][1] - r0["start"][1]
+    L0 = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / L0, dy / L0
+    pts = {}                                   # floor -> (plan centre along the line, elevation's centre across)
+    for fi, e in runs.items():
+        r, sh = e.extra["runs"][0], shifts[e.sheet]
+        a = (r["start"][0] + sh[0] - p0[0], r["start"][1] + sh[1] - p0[1])
+        c = (r["end"][0] + sh[0] - p0[0], r["end"][1] + sh[1] - p0[1])
+        if abs((c[0] - a[0]) * uy - (c[1] - a[1]) * ux) > 0.05 * math.hypot(c[0] - a[0], c[1] - a[1])                 or max(abs(-a[0] * uy + a[1] * ux), abs(-c[0] * uy + c[1] * ux)) > 300.0:
+            if fi in bands:
+                return no(f"its plan walls are not on one line from floor to floor")
+            continue
+        if ys[fi] is None:
+            continue
+        # the elevation across, at the floor's level: where it is as long as the plan's wall
+        Lp = math.hypot(c[0] - a[0], c[1] - a[1])
+        best, h = None, ys[fi] - 600 * s_
+        while h <= ys[fi] + 600 * s_:
+            got = _across(poly, h)
+            if len(got) == 1:
+                rank = (round(abs((got[0][1] - got[0][0]) / s_ - Lp) / 25), abs(h - ys[fi]))
+                if best is None or rank < best[0]:
+                    best = (rank, got[0])
+            h += 25 * s_
+        if best is None or best[0][0] * 25 > max(150.0, 0.1 * Lp):
+            continue
+        along = ((a[0] + c[0]) / 2) * ux + ((a[1] + c[1]) / 2) * uy
+        pts[fi] = (along, (best[1][0] + best[1][1]) / 2 / s_, fi)
+    if len(pts) < 2:
+        return no("too few floors draw it to place the elevation on the plan")
+    # which way round: across the elevation and along the plan, from floor to floor
+    order = sorted(pts)
+    votes = []
+    for f0, f1 in zip(order, order[1:]):
+        dp, de = pts[f1][0] - pts[f0][0], pts[f1][1] - pts[f0][1]
+        if abs(dp) > 100 and abs(de) > 100:
+            votes.append(1 if dp * de > 0 else -1)
+    if not votes or len(set(votes)) > 1:
+        return no("which way round it stands on the plan is unclear" if not votes else
+                  "the plans and the elevation move it in different directions")
+    sg = votes[0]
+    if plane is not None and "dir" not in plane:
+        plane["dir"] = (sg * ux, sg * uy)
+    k = sum(p[0] - sg * p[1] for p in pts.values()) / len(pts)
+    off = {fi: p[0] - (sg * p[1] + k) for fi, p in pts.items()}
+    worst = max(off, key=lambda fi: abs(off[fi]))
+    if abs(off[worst]) > 750.0:
+        return no(f"the {keys[worst]} plan draws it {abs(off[worst]):.0f} mm from where the elevation puts it")
+    why = {}
+    for fi in bands:
+        if ys[fi - 1] is None if fi > 0 else True:
+            why[fi] = "the elevation does not show the floor below"
+            continue
+        cut = poly.intersection(box(poly.bounds[0] - 1, ys[fi - 1], poly.bounds[2] + 1, ys[fi]))
+        if cut.geom_type != "Polygon":
+            cut = max(getattr(cut, "geoms", []), key=lambda g: g.area, default=None)
+        if cut is None or cut.geom_type != "Polygon" or cut.area <= 0:
+            why[fi] = "the elevation draws nothing of it in that storey"
+            continue
+        e = runs[fi]
+        r, sh = e.extra["runs"][0], shifts[e.sheet]
+        rs, re_ = r["start"], r["end"]
+        if (re_[0] - rs[0]) * ux + (re_[1] - rs[1]) * uy < 0:
+            rs, re_ = re_, rs                          # this floor's run drawn the other way
+        t0 = (rs[0] + sh[0] - p0[0]) * ux + (rs[1] + sh[1] - p0[1]) * uy
+        # at each floor's level the wall stands where that floor's plan draws it (its beams meet
+        # it there); the difference from the elevation is spread evenly up the storey
+        lo_off = off.get(fi - 1, off.get(fi, 0.0))
+        hi_off = off.get(fi, lo_off)
+        H = (ys[fi] - ys[fi - 1]) / s_
+
+        def along(x, y):
+            z = (y - ys[fi - 1]) / s_
+            return sg * x / s_ + k + lo_off + (hi_off - lo_off) * min(max(z / H, 0.0), 1.0) - t0
+        e.extra["profile_wall"] = {
+            "section": title, "origin": [rs[0], rs[1]], "dir": [ux, uy], "thickness": float(r["thickness"]),
+            "points": _up_to_level([[round(along(x, y), 1), round((y - ys[fi - 1]) / s_, 1)]
+                                    for x, y in cut.exterior.coords[:-1]], H)}
+        why[fi] = ""
+    fit = ", ".join(f"{keys[fi]} {off[fi]:+.0f}" for fi in sorted(off))
+    return why, (f"at each floor where its plan draws it; the plans of {len(pts)} floors differ from the "
+                 f"elevation's lean by, mm: {fit} - spread up the storeys")
+
+
+def _up_to_level(points: list, H: float) -> list:
+    """A shaped wall's profile ([along, up] mm, up from the level below; H its storey): a top
+    drawn under its level by no more than ELEV_TOL_MM (the slab's or beam's underside) taken
+    up to the level, as a straight wall's top is (_band_extent) - its beams and slab sit on it."""
+    top = max((p[1] for p in points), default=H)
+    if not 0.0 < H - top <= ELEV_TOL_MM:
+        return points
+    return [[p[0], round(H, 1) if p[1] >= top - 1.0 else p[1]] for p in points]
+
+
+def _section_lean(b: Building, w: dict, mark: str, bands: list, ys: list, scale, keys: list, floor_of: dict,
+                  verticals: list, shifts: dict, title: str, plane) -> tuple:
+    """What a wall elevation draws changing shape, built as the section draws it (user
+    2026-10-28: "SW13 and C12 should be leaning"; "leaning ... based on details and sections,
+    not ... column shift"). Winter Villa, SHEAR WALL ELEVATION (SW15 , SA14 , SW13 ,C12 ): SW13
+    stands across the elevation, C12 is a column, the plans above draw them shifted up to ~1 m
+    off the lean.
+
+    It starts where the plan of the floor under its first leaning storey draws it, and moves
+    with the drawn outline's middle, along the way the elevation runs on the plans (plane, from
+    _profile_walls); at each floor's level it is moved onto that floor's plan, where its beams
+    meet it, the difference spread up the storey (user 2026-10-28: "why disjoint again"), and
+    said as a warning past 300 mm. Only what a section draws leaning leans: a column a plan
+    merely draws shifted from the floor below stays upright. A wall along that way gets
+    extra["profile_wall"], as _profile_walls; anything else extra["lean"] {section, base, top}:
+    where its bottom and top stand, mm from where its plan draws it.
+    Returns ({floor index: '' (leaning) or why not}, how it was placed)."""
+    from shapely.geometry import Polygon, box
+    s_ = scale or 0.0
+
+    def no(why):
+        return {fi: why for fi in bands}, ""
+    if not s_ or len(w.get("outline") or []) < 3:
+        return no("the elevation's scale is not known")
+    if not plane:
+        return no("no wall of the elevation shows which way it faces on the plans")
+    poly = Polygon(w["outline"]).buffer(0)
+    _x0, y_lo, _x1, y_hi = poly.bounds
+
+    def middle(y):                             # the outline's middle across, at height y
+        got = _across(poly, min(max(y, y_lo + 1.0), y_hi - 1.0))
+        return (got[0][0] + got[-1][1]) / 2 if got else None
+    key = _key_of(mark)
+    mine = defaultdict(list)
+    for e in verticals:
+        if _key_of(str(e.final("mark") or e.mark or "")) == key and shifts.get(e.sheet) is not None \
+                and _centre_of(e) is not None:
+            mine[floor_of[e.sheet]].append(e)
+
+    def at(e):                                 # its middle, the plans moved onto each other
+        c, sh = _centre_of(e), shifts[e.sheet]
+        return c[0] + sh[0], c[1] + sh[1]
+    a = min(bands) - 1
+    if a < 0 or len(mine.get(a, [])) != 1 or ys[a] is None or middle(ys[a]) is None:
+        return no(f"the plan under its lean does not draw {mark} once, to start it from")
+    pa, ca = at(mine[a][0]), middle(ys[a])
+    vx, vy = plane
+
+    def spot(y):                               # where the section puts its middle at height y
+        m = middle(y)
+        d = (m - ca) / s_ if m is not None else 0.0
+        return pa[0] + vx * d, pa[1] + vy * d
+    # at each floor's level it stands where that floor's plan draws it - its beams meet it there
+    # (user 2026-10-28: the load must travel) - the plan's difference from the section spread up
+    # the storey; a floor whose plan does not draw it once takes the one below's
+    offs = {}
+    for f in range(a, max(bands) + 1):
+        es = mine.get(f) or []
+        if len(es) == 1 and ys[f] is not None:
+            p, q = at(es[0]), spot(ys[f])
+            offs[f] = (p[0] - q[0], p[1] - q[1])
+
+    def off_at(f):
+        g = max((k for k in offs if k <= f), default=a)
+        return offs.get(g, (0.0, 0.0))
+    why, off, kinds = {}, {}, set()
+    for fi in bands:
+        es = mine.get(fi) or []
+        if len(es) != 1 or ys[fi - 1] is None or ys[fi] is None:
+            why[fi] = f"the plan does not draw {mark} once on that floor"
+            continue
+        e, p = es[0], at(es[0])
+        runs = e.extra.get("runs") or []
+        r = runs[0] if e.type == "wall" and len(runs) == 1 else None
+        L = math.dist(r["start"], r["end"]) if r else 0.0
+        if r and L > 1.0 and abs((r["end"][0] - r["start"][0]) * vx + (r["end"][1] - r["start"][1]) * vy) > 0.9 * L:
+            # along the elevation: its drawn outline as a profile wall, as _profile_walls
+            cut = poly.intersection(box(poly.bounds[0] - 1, ys[fi - 1], poly.bounds[2] + 1, ys[fi]))
+            if cut.geom_type != "Polygon":
+                cut = max(getattr(cut, "geoms", []), key=lambda g: g.area, default=None)
+            if cut is None or cut.geom_type != "Polygon" or cut.area <= 0:
+                why[fi] = "the elevation draws nothing of it in that storey"
+                continue
+            rs, re_ = r["start"], r["end"]
+            if (re_[0] - rs[0]) * vx + (re_[1] - rs[1]) * vy < 0:
+                rs, re_ = re_, rs
+            ux, uy = (re_[0] - rs[0]) / L, (re_[1] - rs[1]) / L
+            sh = shifts[e.sheet]
+            t0 = (pa[0] - rs[0] - sh[0]) * ux + (pa[1] - rs[1] - sh[1]) * uy
+            o0, o1 = off_at(fi - 1), offs[fi]
+            d0, d1 = o0[0] * ux + o0[1] * uy, o1[0] * ux + o1[1] * uy
+            H = (ys[fi] - ys[fi - 1]) / s_
+
+            def along(x, y):
+                z = min(max((y - ys[fi - 1]) / s_ / H, 0.0), 1.0)
+                return t0 + (x - ca) / s_ + d0 + (d1 - d0) * z
+            e.extra["profile_wall"] = {
+                "section": title, "origin": [rs[0], rs[1]], "dir": [ux, uy], "thickness": float(r["thickness"]),
+                "points": _up_to_level([[round(along(x, y), 1), round((y - ys[fi - 1]) / s_, 1)]
+                                        for x, y in cut.exterior.coords[:-1]], H)}
+            kinds.add("a profile wall")
+        else:
+            (lx, ly), (hx, hy) = spot(ys[fi - 1]), spot(ys[fi])
+            o0, o1 = off_at(fi - 1), offs[fi]
+            lo, hi = (lx + o0[0], ly + o0[1]), (hx + o1[0], hy + o1[1])
+            e.extra["lean"] = {"section": title, "base": [round(lo[0] - p[0], 1), round(lo[1] - p[1], 1)],
+                               "top": [round(hi[0] - p[0], 1), round(hi[1] - p[1], 1)]}
+            kinds.add("a slanted column" if e.type == "column" else "a slanted wall")
+        off[fi] = math.dist(spot(ys[fi]), p)
+        why[fi] = ""
+    fit = ", ".join(f"{keys[fi]} {off[fi]:.0f}" for fi in sorted(off))
+    if off and max(off.values()) > 300.0:
+        worst = max(off, key=off.get)
+        b.issues.append(Issue(WARNING, WALL_ELEV, f"{mark}: the plans and {title} disagree where it stands - the "
+                              f"{keys[worst]} plan draws it {off[worst]:.0f} mm from where the section's lean puts it "
+                              f"(mm, by floor: {fit}). Built to meet each floor's beams where the plans draw it, "
+                              "the section's shape between; correct the drawing that is wrong", mark=mark,
+                              extra={"from_linker": True}))
+    return why, (f"{' / '.join(sorted(kinds))}: the section's shape, meeting each floor where its plan draws it "
+                 f"(its beams there); the plans draw it off the section's lean by, mm: {fit}")
+
+
+def _raft_level(b: Building, r, z, drawn_t, heights: dict, keys: list, src: str, why: str, stats) -> None:
+    """A raft's founding level (its bottom) from the top a wall elevation draws (z: floor index,
+    mm above that floor's level line): that top less its thickness - the one decided in the
+    review, else the one drawn under the wall (the elevation's scale confirmed by its written
+    storey heights). Nothing when that floor has no elevation (read or decided), or when a
+    founding level was decided - for this raft in the review, or for all (the Foundation height
+    on the Floors page, "founding level for all"): the person's level wins."""
+    i, off = z
+    fv = r.resolved.get(FOUNDING)
+    if i is None or (fv is not None and fv.status == OVERRIDE):
+        return                                       # decided: for this raft, or for all on the Floors page
+    rmark = r.final("mark") or r.mark or "raft"
+    if heights.get(keys[i]) is None:
+        b.issues.append(Issue(INFO, WALL_ELEV, f"raft {rmark}: {why} - give {keys[i]} an elevation (Floors page) "
+                              "and its founding level follows", sheet=r.sheet, elements=[r.id],
+                              extra={"from_linker": True}))
+        return
+    top = heights[keys[i]] + off
+    put = []
+    tv = r.resolved.get("thickness")
+    if tv is None or tv.status not in (READ, OVERRIDE) or not tv.value:
+        if not drawn_t:
+            return
+        r.resolved["thickness"] = Value(float(round(drawn_t)), READ, 0.6, [Evidence(
+            reader=READER, sheet=src, source=f"{WALL_ELEV}: drawn {drawn_t:.0f} thick under the wall - {why}")])
+        put.append("thickness")
+    t = float(r.resolved["thickness"].value)
+    r.resolved[FOUNDING] = Value(float(round(top - t)), READ, 0.8, [Evidence(
+        reader=READER, sheet=src, source=f"{WALL_ELEV}: top {top:+.0f} less {t:.0f} thick - {why}")])
+    put.append(FOUNDING)
+    r.extra["wall_height"] = {"set": put}
+    # no longer missing: out of the 'no founding level' / 'no thickness' issues
+    for iss in list(b.issues):
+        if r.id in iss.elements and iss.category == "missing" and ("founding level" in iss.message or
+                                                                    (put[0] == "thickness" and "thickness" in iss.message)):
+            iss.elements.remove(r.id)
+            if not iss.elements:
+                b.issues.remove(iss)
+    note = (f"the elevation draws it {drawn_t:.0f} thick; {t:.0f}, decided in the review, is used"
+            if drawn_t and tv is not None and tv.status == OVERRIDE and abs(t - drawn_t) > 1 else f"{t:.0f} thick")
+    b.issues.append(Issue(INFO, WALL_ELEV, f"raft {rmark}: top at {top:+.0f} ({why}); {note} - founding level "
+                          f"{top - t:+.0f}", sheet=r.sheet, elements=[r.id], extra={"from_linker": True}))
+    stats["rafts given a founding level by a wall elevation"] += 1
+
+
+# a column that ends at this floor, however the drawing words it: COLUMN STOP, STOP COLUMN,
+# COLUMN TERMINATES, COLUMN ENDS HERE, DISCONTINUED, NOT CONTINUED, UP TO THIS LEVEL. Never "SC"
+# alone: a stub column to one office, a steel column to another
+# (letters around a word, not \b: layer names join words with _ as often as with a space)
+COLUMN_ENDS = re.compile(r"(?<![A-Z])STOP|TERMINAT|(?<![A-Z])END(?:S|ING)?(?![A-Z])|DISCONTINU|NOT[\s_-]*CONTINU"
+                         r"|UP[\s_-]*TO[\s_-]*THIS", re.I)
+COLUMN_STARTS = re.compile(r"(?<![A-Z])STUB|FLOAT|(?<![A-Z])START(?:S|ING)?(?![A-Z])", re.I)
+
+
+def _column_stops(b: Building, stats) -> None:
+    """Columns and walls drawn on a plan's 'column stop' layer (COLUMN_ENDS: stop, terminates,
+    ends, discontinued ...) end at that floor: built up to it and none above, as the plans
+    above leave them out. Said per plan, so it shows - and a plan above that still draws one
+    of those marks is pointed out."""
+    for sid, s in b.sheets.items():
+        if s.reader != "plan.legacy":
+            continue
+        stop = [e for e in b.elements if e.sheet == sid and e.type in ("column", "wall") and not gone(e)
+                and COLUMN_ENDS.search(str(e.extra.get("_layer") or ""))
+                and not COLUMN_STARTS.search(str(e.extra.get("_layer") or ""))]
+        if not stop:
+            continue
+        r = level_rank(s.extra.get("level_key") or "")
+        above = [o for o, os_ in b.sheets.items() if os_.reader == "plan.legacy" and r is not None
+                 and os_.extra.get("set") == s.extra.get("set")
+                 and (level_rank(os_.extra.get("level_key") or "") or -1e9) > r]
+        nxt = min(above, key=lambda o: level_rank(b.sheets[o].extra["level_key"])) if above else None
+        # a column's mark drawn again above (a wall carries its mark on, piece by piece)
+        up = {_key_of(str(o.final("mark") or o.mark or "")) for o in b.elements
+              if o.sheet == nxt and o.type == "column" and not gone(o)} if nxt else set()
+        marks = sorted({str(e.final("mark") or e.mark or "unmarked") for e in stop})
+        again = sorted({str(e.final("mark") or e.mark) for e in stop if e.type == "column"
+                        and (e.final("mark") or e.mark) and _key_of(str(e.final("mark") or e.mark)) in up})
+        for e in stop:
+            e.extra["stops_here"] = True
+        lv = s.level or s.extra.get("level_key") or sid
+        b.issues.append(Issue(WARNING if again else INFO, "column stop",
+                              f"{len(stop)} columns/walls drawn on the column-stop layer end at {lv}: "
+                              f"{', '.join(marks)} - built up to {lv}, none above"
+                              + (f". The {b.sheets[nxt].level or b.sheets[nxt].extra.get('level_key')} plan still "
+                                 f"draws {', '.join(again)}: check whether that is the same column" if again else ""),
+                              sheet=sid, elements=[e.id for e in stop], extra={"from_linker": True}))
+        stats["columns/walls ending at their floor (column-stop layer)"] += len(stop)
 
 
 def _section_heights(b: Building, stats) -> None:
@@ -2257,6 +4290,111 @@ def _run_marks(b: Building) -> dict[str, tuple[str, str]]:
                         todo.append(j)
             if len(found) == 1:
                 out[e.id] = next(iter(found.items()))
+    return out
+
+
+def _detail_span_marks(b: Building, from_captions) -> dict[str, tuple[str, str]]:
+    """Unmarked spans of a beam its detail shows running over several grids.
+
+    NIFT writes 2B5 once on the plan, on one span; its beam detail draws it as one beam
+    from grid (A)Y11' to (A)Y17, over the columns between (beam_sections._detail_grid_rows).
+    The plan's grid lines are named by the labels at their ends; an unmarked span in line
+    with the marked one, as wide, and between the first and last of those grids, is that
+    beam. Two beams' details claiming one span: nothing taken. Only where no other source
+    marks the span (it is an "inherited" mark). {beam id: (mark, the marked span's id)}"""
+    from .readers.beam_sections import _axis as grid_axis, grid_key
+    spans = defaultdict(list)                       # (set, mark) -> [[grid label, ...], ...]
+    for s in b.of("spec"):
+        if s.extra.get("grid_span") and s.get("family") == "beam" and s.mark:
+            spans[(_set_of(b, s), _key_of(s.mark))].append([grid_key(g) for g in s.extra["grid_span"]])
+    if not spans:
+        return {}
+    out = {}
+    for sid, s in b.sheets.items():
+        view = b.sheets.get(s.extra.get("view_sheet", ""))
+        if s.reader != "plan.legacy" or view is None or not view.extra.get("grid_labels") or not s.grids:
+            continue
+        # each label names the grid line ending nearest it (its bubble beside the line's end:
+        # NIFT's labels stand 600 off the line); a label at both ends naming two lines: neither
+        named = {}
+        for text, x, y, h in view.extra["grid_labels"]:
+            best = None
+            for g in s.grids:
+                (ax, ay), (cx, cy) = g["start"][:2], g["end"][:2]
+                L = math.hypot(cx - ax, cy - ay)
+                if L <= 0 or min(math.hypot(x - ax, y - ay), math.hypot(x - cx, y - cy)) > 8.0 * h:
+                    continue
+                across = abs((x - ax) * (cy - ay) - (y - ay) * (cx - ax)) / L
+                if across <= 4.0 * h and (best is None or across < best[0]):
+                    best = (across, ((ax, ay), (cx, cy)))
+            if best:
+                named.setdefault(grid_key(text), set()).add(best[1])
+        named = {k: next(iter(v)) for k, v in named.items() if len(v) == 1}
+        # a grid shown only by its labelled bubble (NIFT 4th floor: 13 lines drawn for 23
+        # grids) runs through its label, as the drawn lines of its own family run; with no
+        # line of its family drawn, it is not placed
+        fam = {}
+        for k, ((ax, ay), (cx, cy)) in named.items():
+            L = math.hypot(cx - ax, cy - ay)
+            fam.setdefault(grid_axis(k), ((cx - ax) / L, (cy - ay) / L))
+        for text, x, y, h in view.extra["grid_labels"]:
+            k = grid_key(text)
+            d = fam.get(grid_axis(k))
+            if k not in named and d is not None:
+                named[k] = ((x, y), (x + 1000.0 * d[0], y + 1000.0 * d[1]))
+        beams = [e for e in b.elements if e.sheet == sid and e.type in ("beam", "beam_span") and not gone(e)
+                 and not e.geometry.get("mid") and e.geometry.get("start") and e.geometry.get("end")]
+
+        def marks_of(e):
+            # its own tag, and the captions beside it (NIFT tags its beams by captions)
+            return {m for m, _ in from_captions.get(e.id, [])} | ({_key_of(e.mark)} if e.mark else set())
+        claims = defaultdict(set)
+        for m in beams:
+            mine = marks_of(m)
+            ranges = spans.get((s.extra.get("set", ""), next(iter(mine)))) if len(mine) == 1 else None
+            if not ranges:
+                continue
+            mark = next(iter(mine))
+            (px, py), (qx, qy) = m.geometry["start"][:2], m.geometry["end"][:2]
+            L = math.hypot(qx - px, qy - py) or 1.0
+            ux, uy = (qx - px) / L, (qy - py) / L
+
+            def along(pt):
+                return (pt[0] - px) * ux + (pt[1] - py) * uy
+
+            def cross_at(line):
+                """Where a grid line crosses this beam's line: distance along it, or None."""
+                (ax, ay), (cx, cy) = line
+                dx, dy = cx - ax, cy - ay
+                den = ux * dy - uy * dx
+                if abs(den) < 0.3 * math.hypot(dx, dy):
+                    return None                     # (nearly) parallel: not across it
+                t = ((ax - px) * dy - (ay - py) * dx) / den
+                return t
+            for labels in ranges:
+                ts = [t for g in labels if g in named and (t := cross_at(named[g])) is not None]
+                if len(ts) < 2:
+                    continue
+                lo, hi = min(ts) - 300.0, max(ts) + 300.0
+                if not lo <= along(((px + qx) / 2.0, (py + qy) / 2.0)) <= hi:
+                    continue                        # the marked span is not in that stretch
+                w = float(m.get("width") or 0.0)
+                for e in beams:
+                    if e is m or marks_of(e):
+                        continue
+                    (ex, ey), (fx, fy) = e.geometry["start"][:2], e.geometry["end"][:2]
+                    le = math.hypot(fx - ex, fy - ey) or 1.0
+                    if abs(((fx - ex) / le) * uy - ((fy - ey) / le) * ux) > 0.035:
+                        continue                    # not in line
+                    if max(abs((ex - px) * -uy + (ey - py) * ux), abs((fx - px) * -uy + (fy - py) * ux)) > 60.0:
+                        continue
+                    if w and e.get("width") and abs(float(e.get("width")) - w) > 10.0:
+                        continue
+                    if lo <= min(along((ex, ey)), along((fx, fy))) and max(along((ex, ey)), along((fx, fy))) <= hi:
+                        claims[e.id].add((mark, m.id))
+        for eid, got in claims.items():
+            if len({_key_of(mk) for mk, _ in got}) == 1:
+                out[eid] = sorted(got)[0]
     return out
 
 

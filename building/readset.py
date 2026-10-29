@@ -41,7 +41,7 @@ from building.profiles.suggest import suggest          # noqa: E402
 from building.readers import (beam_sections, building_sections, column_schedule, columns, details,  # noqa: E402
                               elevations, foundations, labels, layer_sizes, legacy_plan, legend_zones, linework,
                               scope, stairs,
-                              tables)
+                              tables, wall_elevations)
 from building.sheets import register, to_building      # noqa: E402
 from building.sheets.levels import custom_floor        # noqa: E402
 from building.sheets.__main__ import drawings          # noqa: E402
@@ -308,6 +308,14 @@ def read_set(out: str, paths: list[str], level_names: dict[str, str] | None = No
         for r in recs:
             if r.view.source in ("stray", "overview") or r.view.same_as:
                 continue
+            if getattr(r.view, "inside_blocks", False):
+                # a section or detail found inside blocks (views._regions): only what keeps its
+                # reading on the sheet - an element added here would renumber every element read
+                # after it, and saved review decisions are keyed by those ids
+                walls_h = wall_elevations.read(b, r)
+                if walls_h:
+                    log(f"     {r.view.id}: {walls_h} walls drawn in elevation (base, top)")
+                continue
             got = {**labels.read(b, r, fam or None), **tables.read(b, r), **details.read(b, r),
                    **foundations.read(b, r), **columns.read(b, r), **column_schedule.read(b, r),
                    **stairs.read(b, r), **elevations.read(b, r)}
@@ -324,6 +332,9 @@ def read_set(out: str, paths: list[str], level_names: dict[str, str] | None = No
             cuts_h = building_sections.read(b, r)
             if cuts_h:
                 got["building sections (levels, heights, slopes)"] = cuts_h
+            walls_h = wall_elevations.read(b, r)
+            if walls_h:
+                got["walls drawn in elevation (base, top)"] = walls_h
             styled = linework.read(b, r)
             if styled:
                 got["beam lines with their style (dashed / solid)"] = styled
@@ -464,6 +475,10 @@ def read_set(out: str, paths: list[str], level_names: dict[str, str] | None = No
                 + ("" if has_layouts else " (this plan alone, split by its title)" if r.id in alone
                    else " (this floor alone)" if r.id in others else " (whole file, as before)")
                 + (f" [profile: {', '.join(b.sheets[sid].extra['profiles'])}]" if active else ""))
+    # beam sections drawn as loose lines: added last, so no other element's id moves
+    late = beam_sections.add_late(b)
+    if late:
+        log(f"\n{late} beam sections drawn with loose lines (no closed outline) read")
     # two different floors of one drawing set given the same Revit level on the Floors page
     # (ankit's Akanistha: L1 = "Level 3" and L3 = "Level 3") would be built one on the other
     on = {}

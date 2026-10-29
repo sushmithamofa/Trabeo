@@ -53,6 +53,9 @@ class View:
     # the shift that puts them on the plan
     borrow: list = field(default_factory=list)
     borrow_shift: tuple = (0.0, 0.0)
+    # a section or detail whose drawing is kept inside blocks: read as a section or detail,
+    # never as a plan (registry)
+    inside_blocks: bool = False
 
     @property
     def size(self) -> tuple[float, float]:
@@ -148,6 +151,27 @@ def _titled_floor_plan(es) -> bool:
     return False
 
 
+# a section's or detail's own title ("SECTION 1", "SECTION A-A", "FOOTING DETAILS", "TYP. BEAM
+# SECTION"); not "SECTION MARK" or a note
+_HELD_TITLE = re.compile(r"^(?:TYP(?:ICAL)?\.?\s+)?(?:[A-Z]+\s+){0,2}(?:SECTION|DETAILS?|ELEVATION)S?"
+                         r"(?!\s*(?:MARK|TYPE|SYMBOL|LINE))(?:\s*(?:OF\s+[A-Z ]+|[:\-]?\s*[A-Z0-9]{1,3}'?"
+                         r"(?:\s*-\s*[A-Z0-9]{1,3}'?)?))?\s*$")
+
+
+def _titled_detail(es) -> bool:
+    """A text of its own (not inside a block) that titles a section or detail."""
+    for e in es:
+        if e.dxftype() in ("TEXT", "MTEXT"):
+            try:
+                s = e.plain_text() if e.dxftype() == "MTEXT" else e.dxf.text
+            except Exception:
+                continue
+            s = clean(s or "").upper().strip()
+            if len(s) <= 40 and _HELD_TITLE.match(s):
+                return True
+    return False
+
+
 def _drawn(e, seen: dict, depth: int = 0) -> int:
     """How many drawn things an entity stands for: an INSERT counts what its block
     holds (AKANISTHA's terrace plan is one block "TERRACE" - 22 entities on top,
@@ -221,6 +245,13 @@ def _regions(items, source: str, prefix: str) -> list[View]:
         views[0].source = source
     for n, v in enumerate(views, 1):
         v.id = f"{'S' if v.source == 'stray' else prefix}{n}"
+    for v in views:
+        if v.source == "stray" and _titled_detail(ents[h] for h in v.handles) and \
+                sum(_drawn(ents[h], held) for h in v.handles) >= STRAY_MAX:
+            # a section or detail drawn inside blocks (Winter Villa's "SECTION 1": 15 entities on
+            # top, about 800 in its blocks) is read, under the id it had - every other view
+            # keeps its id, so decisions saved against them stay where they were
+            v.source, v.inside_blocks = source, True
     return views
 
 
@@ -971,6 +1002,9 @@ def find_views(doc) -> list[View]:
             floors = []
         out = []
         for r in regions:
+            if r.inside_blocks:
+                out.append(r)                       # one section or detail, kept whole
+                continue
             its = [by_handle[h] for h in r.handles if h in by_handle]
             mine = [t for t in floors if t.handle in set(r.handles)]
             parts = _like_a_sheet(r, its, mine) if r.source == "model region" else []

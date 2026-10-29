@@ -21,6 +21,8 @@ READER = "linework"
 PLAN_KINDS = ("framing_plan",)
 BEAMISH = re.compile(r"BEAM|BM\b|GIRDER|\bSB\b|^SB|LINTEL", re.I)
 MIN_MM = 300.0
+WALLISH = re.compile(r"WALL|SHEAR|\bRCC?\s*W", re.I)       # RC walls also close slab bays
+MASONRY = re.compile(r"BRICK|BLOCK|MASON|PARTITION|AAC", re.I)
 
 
 def _dashed_types(doc) -> set:
@@ -45,11 +47,21 @@ def read(b, rec) -> int:
     dashed = _dashed_types(doc)
     layer_lt = {}
     lines, layers = [], []
+    walls = []                                    # RC wall layers' straight lines (linker._marked_bays)
     for h in view.handles:
         e = db.get(h)
         if e is None or e.dxftype() not in ("LINE", "LWPOLYLINE"):
             continue
         lay = e.dxf.layer
+        if WALLISH.search(lay) and not MASONRY.search(lay):
+            if e.dxftype() == "LINE":
+                wp = [(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)]
+            else:
+                wp = [(p[0], p[1]) for p in e.get_points("xy")]
+                if e.closed and wp:
+                    wp.append(wp[0])
+            walls += [[round(a[0]), round(a[1]), round(c[0]), round(c[1])] for a, c in zip(wp, wp[1:])
+                      if math.dist(a, c) >= MIN_MM]
         if not BEAMISH.search(lay):
             continue
         name = (e.dxf.get("linetype", "BYLAYER") or "BYLAYER").upper()
@@ -75,4 +87,6 @@ def read(b, rec) -> int:
                 lines.append([layers.index(lay), round(a[0]), round(a[1]), round(c[0]), round(c[1]), d])
     if lines:
         b.sheets[rec.id].extra["beam_lines"] = {"layers": layers, "lines": lines}
+    if walls:
+        b.sheets[rec.id].extra["wall_lines"] = walls
     return len(lines)

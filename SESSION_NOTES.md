@@ -2490,3 +2490,377 @@ decisions, linker, export, model.json, Revit / IFC / Rhino files.
   the item's own info. Raft items now carry "id": e.id like footings (Revit/IFC/Rhino ignore it, as for
   footings). Verified on a copy of test 2\test 4: RF1 / RF2 selectable; 22/22 groups, 700 tests.
   Also: Review's plan colours rafts purple = "decided" (missing is yellow) - not a fault.
+* 2026-10-26 TRABEO: the app's name from now on (trademark note: a German van-fitting company,
+  TRABEO Fahrzeugausbau GmbH, has a "Trabeo" wordmark - other industry; have a trademark agent check
+  classes 9 / 42 before selling). Development moved here, to Documents\Trabeo\Trabeo = the PRIVATE
+  GitHub repository github.com/sushmithamofa/Trabeo (2 commits pushed via GitHub Desktop, 1014 files,
+  everything incl. clients' drawings, baselines, notes and chat/ - the owner's decision). .gitignore:
+  runs/, caches, access/ + access_config.json (sign-in tied to this PC; without them the app opens with
+  no sign-in on another PC). chat/: summaries/ (daily) + full/ (every session as readable text; times
+  UTC). 26/26 test groups pass in this folder; the main app (8765) now runs from here. The old folder
+  Documents\Structure CAD to Revit\New version is left as it was - make new changes HERE, commit, push;
+  pull before working after the other PC has pushed.
+* 2026-10-26 (evening, this folder): COPY COMPLETED - robocopy /E /XC /XN /XO from New version: 731
+  files (1.1 GB: runs\, the 6 sub-folder README.md, caches) copied, 0 failed, nothing overwritten; all
+  1814 old files present here. SIGN-IN SOURCE MOVED: access_config.json and ~\.c2r_admin\users.json
+  "source" -> Trabeo\access (backup users_before_2026-10-26_trabeo_move.json); published 5 users;
+  access/office selftests pass. Office app (8770) and main app (8765) both started from Trabeo
+  (run_office.bat / run_app.bat). Note: the New version copy still reads its OWN old access list.
+* 2026-10-26 Discussion only (nothing built): testers outside the office. Free: installer per tester
+  (compiled, signed list on a free web page with URL source - access.request() returns False for a
+  web source, the PC code is shown to send), Tailscale share of this PC's office mode, a spare office
+  PC as host. FOUND (not fixed): behind a Cloudflare / Tailscale Funnel tunnel, cloudflared connects
+  from 127.0.0.1, so H._remote() is False for every internet visitor -> owner's view after sign-in
+  (any folder, owner's projects, Users page for an admin). Must be fixed before any tunnel, with the
+  https Origin check (webapp _same_origin: http://Host only) and office_url (e-mailed links use the
+  PC name). Plain office mode on the LAN is not affected.
+* 2026-10-26 SECTIONS AND DETAILS (user: "read all sections and details and build on them, like an
+  engineer, generally, without breaking anything"). IN PROGRESS on a scratchpad copy (code_try),
+  NOT YET IN THIS FOLDER:
+  (1) views._regions: a stray whose own (top-level) text titles a section/detail (_HELD_TITLE:
+      SECTION 1, SECTION A-A, FOOTING DETAILS, TYP. BEAM SECTION; not SECTION MARK) and whose
+      inserts hold >= STRAY_MAX drawn entities (_drawn) -> source as the region's, View.inside_blocks
+      = True, id UNCHANGED (ids are assigned first, so no other view is renumbered); find_views keeps
+      it whole (no title split / twins). registry: inside_blocks -> kind from its title among
+      _HELD_KINDS, else "section" - never a plan/schedule/legend, so no floor is read from it;
+      sheet.extra.view.inside_blocks = True.
+  (2) elevations.ELEV "LVL. +1440" branch: (?!0\d(?!\d)) - "LEVEL -01" / "LEVEL 05" is the level's
+      number (Winter Villa's architect's sections gave -1 mm markers). +000, -050, +1440 as before.
+  (3) review.data()["details"] (_details): every section/detail sheet (kinds DETAIL_KINDS, or a stray
+      titled SECTION/DETAIL/ELEVATION with >= 5 entities): read (types made on it, n elements citing it
+      in evidence), "nothing" (read, nothing usable), "not" (stray: why). Side list "Sections and
+      details" under Issues.
+  Tests added: sheets selftest (section in blocks, ids kept), stage7 (level's own number), linker
+  (details list). 33 / 10 / 44 pass on the copy. fresh_all before vs try (deep_cmp.py: every element,
+  sheet, issue and revit_build file): 14/16 projects identical, only test 2\test 4 (Winter Villa):
+  4 sections read (S16, S18, S19, S20), 4 level markers -> 0 after (2). Final before/after run in
+  progress; then copy into this folder, run_all_tests --baselines, restart both apps.
+  Scratchpad tools (session 8d1f6e94): fresh_all.py (C2R_APP=code dir), deep_cmp.py, why_diff.py,
+  stray_probe.py, stray_texts.py; code_before = HEAD snapshot.
+  Next readers (from the details list - read but nothing usable yet): NIFT SECTION A-A..D-D and
+  TYP. DETAIL OF BRACKET, NIFT foundation "SCTION F-F" (2050 entities), Pirgal SECTION X-X / Z-Z /
+  Y1-Y1 / 3-3, Pirgal SCHEDULE OF SLAB REINF.; Winter Villa sections: floor heights from the
+  dimensions between LEVEL 00..05 (3900 / 5850 / 2800) - architect's section: levels only.
+* 2026-10-27 COLUMN EXTENT FROM THE COLUMN SCHEDULE (user: "handle all the things it is not handling").
+  Plan convention kept: a plan's columns stand under its slab, built from the level below up to it.
+  New linker._column_extent (runs after apply_overrides, so review marks are used and a review
+  "kind" decision always wins), from the schedule's level ranges (_schedule_ranges: the schedule
+  sheets' column_schedule record - unsized sections count - plus sized specs; a schedule with no
+  set applies to every set):
+    * schedule STARTS the column at this plan's level (C9 "L1 TO L2" on the L1 plan): resolved
+      kind = column_float -> export writes kind column_float -> Revit / IFC / 3D raise it from this
+      level to the next (viewer3d now uses e.final("kind")). If the plan above draws the same column
+      too (same stack, else within 300 mm): not changed, WARNING "exclude it in the review".
+    * schedule has no such column at this level: WARNING (not repeated where _fits_schedule warned).
+    * schedule runs on above the highest imported plan (C1 to ROOF, no ROOF plan), or legend
+      "column through" on the top plan: one WARNING per plan - built up to that plan only.
+  FC marks / column_float layers untouched. Review shows "kind" where the linker set it.
+  None of the sample sets triggers it (every scheduled column there starts at FDN).
+  Tests: foundations_selftest +6, stage8 +1. 22/22 suites (707 tests) + all 4 baselines pass.
+* 2026-10-27 BEAM SECTIONS DRAWN WITH LOOSE LINES (user: "beams are not modelled based on the section").
+  Cause (NIFT A1, project test 2\test 5): its sections (SECTION A-A x4, B-B, D-D, X-X) are drawn with
+  separate LINEs (the beam hanging under the slab, no line across its top) and real DIMENSION
+  entities (DIMLFAC 0.25); readers/beam_sections only read a closed polyline with exploded dimension
+  text, so all were skipped. Also the linker only ever gave a section's SHAPE, never a missing depth.
+  * beam_sections._sketch_sections: only for titles read_sections found nothing under. Lines (not
+    REINF/DIM/TEXT/HATCH/COL/WALL... layers) snapped within 1 unit, each side carried up to the slab
+    top, polygonized (shapely); the face on the lowest line; needs a BEAM layer, >= 75 % really drawn,
+    no WALL/STUB/COL/FOOTING words without BEAM. Sizes from DIMENSION entities (_solve), else measured
+    at the dimensions' scale ("undimensioned"). extra drawn_as="lines", full_width (its top), rectangle.
+    Kept in _LATE and added by add_late() after every drawing is read (readset): ids L<n>, so NO other
+    element id moves (saved decisions are keyed by id: test 4's rafts M2/raft/92, 93).
+  * linker._sized_by_sketch (in _beam_sections): such a section never gives a shape (no DirectShape)
+    and never joins beams (merge_beams skips it). A beam its cut crosses, as wide as its full-height
+    part (15 mm), with NO depth: written depth -> READ 0.85; measured depth -> Value(D, MISSING, 0.3):
+    built red at it ("the strongest source"), held in strict mode, decided in the review. Width only if
+    missing and written. Other width (D-D 230 across 2B7 300) -> left, said. _sketch_issues: one
+    "section" issue per section and plan.
+  * NIFT result: 7 sections read (A-A 300x625 / 300x600 measured, D-D 230x230, X-X 230x230, B-B 300 +
+    ledge, 600 measured); 9 beams with no depth now built at the section's depth (red). Nothing else
+    changed (fingerprint before/after: every element, value, issue, revit_build file).
+  * Tests: readers selftest +2, stage8 +1. 22/22 suites (710 tests).
+  Scratchpad tools (session 3a67bbb2): fp_run.py (analyse a project with a code copy, fingerprint),
+  fp_cmp.py (compare); code_before = snapshot before this change.
+  * Verified on all 10 of the user's projects (Downloads: test 1..5, NIFT, NIFT 2, AKANISTHA, res, trial),
+    fingerprint before/after: only the intended changes. Two differences seen are NOT this change - the
+    OLD code run twice gives them too (run-to-run, e.g. Python's random string-hash order deciding ties):
+    res slab S12 (150/200 conflict, kept value flips), trial SASANGIR FABRICATION P1 / M1 (MEMBER
+    SCHEDULE 100 vs 96, 150 vs 48), and the order of sources in some conflict messages. OPEN: make
+    those ties deterministic (separate task, not done).
+  * Final: 22/22 suites (710 tests), 4/4 baselines pass. App restarted on the new code.
+* 2026-10-27 FOUNDATIONS (NIFT, test 5): all 56 footings held - no founding level. NOT a reading fault:
+  the column footings' typical section writes the depth as letters only; the general note gives two
+  (1.5 m at 140 kN/m2, 2.5 m at 200 kN/m2 from N.G.L.). The only N.G.L. -> FOUNDATION LVL. dimensions
+  (1500, one 1600) are RETAINING WALL sections RW1/RW2/RW3/RW2A. User: "should not be hardcoded" -> a
+  -1500 I had put in the project's overrides.json was REMOVED (file as before), and a reader of those
+  dimensions was written, found to read only retaining-wall depths, and REMOVED (foundations.py as before).
+  Footings are built once a founding level is decided (review: one level for all, or the Foundation
+  height on the Floors step). Also in the drawings: CF4/CF6-CF8 + 17 strip footings have no depth; F2's
+  size conflicts plan vs schedule.
+* 2026-10-27 BEAM DETAIL SPANS (user: "beam should be modeled based on detail sections"). NIFT writes a
+  continuous beam's mark once on the plan; its detail draws it over a row of grid labels (2B5: (A)Y11'
+  to (A)Y17, over the columns between). The old run rules stop at a column.
+  * readers/beam_sections: _detail_grid_rows -> spec.extra["grid_span"] (labels of the row above the
+    caption, its stretch: split by family X/Y, a repeated label, a number jump > 3, a wide gap; '0'
+    bar-diameter texts are not labels); _plan_grid_labels -> view sheet extra["grid_labels"]. Extras
+    only: nothing counted, no element added (readers baseline unchanged).
+  * linker._detail_span_marks (with the caption marks): plan grid lines named by the label nearest an
+    end (<= 8h along, <= 4h across); a grid shown only by its bubble runs through it, parallel to a DRAWN
+    line of its own family (none drawn: not placed). An unmarked span in line (60 mm), as wide (10 mm),
+    between the first and last grid of the marked beam's detail (+-300) takes the mark - "beam detail
+    span", weight 0.75, an inherited mark (only when nothing else marks it); two marks claiming: none.
+  * NIFT: 23 beams now 4B2 x9, 5B2 x8, 5B4A x3, 5B5/5B6/5B7 - 300 x 600 from their details.
+  * Test: stage8 +1 (columns with outlines, so the old run rule stops at them).
+  * Verified on all 10 projects (fingerprint vs the previous step): only the NIFT beams change (test 5 /
+    NIFT 23, test 1 / NIFT 2 20, trial 24); 22/22 suites (711 tests) + 4/4 baselines. Run-to-run (NOT
+    this change): test 3 levels GF / STILT height_below - both level_rank 0.0, kept in a set, so their
+    order follows Python's random string hash; trial 2ND_FLOOR_JACUZZI SB depth conflict 125 / 750 kept
+    value. OPEN (separate task): make level order and equal-weight conflicts deterministic.
+  * App restarted on the new code.
+* 2026-10-27 SLAB STRIPS FROM A SECTION (user, screenshot of NIFT 5th floor 5B2 edges: "check this beam in
+  section"; then "make it general ... think like an engineer"). SECTION A-A draws the edge beam 300 x 600
+  with its 150 slab running 150 past the outer face and 300 past the inner one, both ends drawn. The
+  plan's slab edge lines beside 5B2 were paired into 150 / 300 wide "beams" (or one plain line 450 off,
+  width none) with no mark/depth -> built red as 600-deep beams beside 5B2.
+  * beam_sections._flanges: per side of a line-drawn section's beam - how far the slab top runs past the
+    face, closed (a drawn end) or open (carrying on), and the slab thickness; written dims else scale.
+    extra["flanges"], extra["slab_thickness"].
+  * linker._slab_strips (in _sized_by_sketch, before sizing): the cut's beam line = the crossed beam as
+    wide as the section's, marked or sized, + its spans in line (W/3) and as wide. An unmarked, no-depth
+    plan "beam" overlapping that line, as wide as a CLOSED flange with its centre W/2 + f/2 off, or a
+    plain/widthless line at W/2 + f (the slab's edge), is that slab strip: extra["slab_strip"] {section,
+    width, thickness, written, shift}, resolved kind "slab edge strip"; its "no depth" issue dropped; one
+    line in the section issue. Open flanges (slab carrying on) never make strips.
+  * export._strip_slab / strip_outline: written as a slab row (outline from the line, shifted to the strip,
+    the section's thickness; measured thickness -> provisional / held). viewer3d draws it as a slab.
+    (A first version reused the loop's `s` in viewer3d and crashed the 3D view: caught, fixed; fp_run.py
+    now also writes the 3D view, so the 10-project check covers it.)
+  * NIFT: L5 6 strips (17, 18 outer 150, 21 inner 300 top; 44 outer 150, 45 inner 300, 71 inner edge
+    line bottom - each centre checked at 225 / 300 from 5B2), L4 4, L2 1, L3 1 (outer 150 strips).
+  * Test: stage8 +1.
+  * Verified on all 10 projects (fingerprint + 3D view vs the previous step): only the NIFT copies change
+    (12 beam rows -> slab strip rows); 22/22 suites (712 tests) + 4/4 baselines. trial P1 flipped back to
+    100 - the known run-to-run tie. App restarted.
+* 2026-10-27 PAIRS OF LINES READ AGAINST THE SECTION (user, CAD screenshot of the 5th floor + SECTION A-A:
+  "i want to model like this"). The top edge Y15-Y23 still had: 5B2 spans with no mark (red), 19 = 450
+  wide captioned 5B2 (beam + outer strip, width conflict 300/450, centre +75), 29 = the beam (drawn again
+  inside 19), 30 = 600 (beam + inner strip). Lines there: -450 / -150 / +150 / +300 = the section's.
+  * linker._section_faces (in _sized_by_sketch, after _slab_strips): measured from a crossed beam DRAWN
+    the section's width (marked one first); a pair across the beam whose BOTH faces are section lines
+    (beam faces, closed flange edges) = beam + strip(s): extra["section_parts"] {section, beam {shift,
+    width} or None, strips [{shift, width, thickness, written}]}; marked/sized keeps the beam (a width
+    conflict whose kept value is W -> READ: the 450 is explained); unmarked keeps it only if < 80 % of its
+    stretch is covered by the line's other beams. extra["same_beam_as"]: an unmarked beam >= 80 % inside
+    a marked one's stretch on the line (built once). Unmarked spans of the line between two spans of one
+    mark -> that mark + its width/depth ("beam line: between two spans of ...", READ 0.75).
+  * export: section_parts -> strip slab rows (+ the beam row moved onto its line: export.beam_line);
+    same_beam_as -> left out, said. viewer3d the same.
+  * readers/beam_sections._plan_grid_labels: label positions at the text's middle (cx/cy), not its start
+    (NIFT '(A)Y18' starts ~500 left of its bubble: Y18 fell short of the span ending on it).
+  * NIFT 5th floor now: top 25-28 5B2 (line), 19 5B2 on the line + 150 strip, 29 drawn twice, 30 = 300
+    inner strip; bottom 43, 46-48 5B2; the end beams 5B4A likewise. Test: stage8 +1.
+  * Verified (fingerprint + 3D view, all 10 projects): only the NIFT copies change (9 marks/depths, 11
+    widths, 3 kinds); test 3 GF/STILT and trial SB = the known run-to-run ties. 22/22 suites (713 tests)
+    + 4/4 baselines. App restarted.
+* 2026-10-27 REVIEW PLAN (user's new project test 2\test 6, run 16:01: "after analysis still same"). The run
+  itself was right (5th floor Revit file: 10 slab strips, 20 x 5B2, 4 red beams; 3D 16 strips) but the 2D
+  review plan (review.data, shown from the run's review.html) still drew every pair as a beam bar.
+  review.data now draws a slab strip as a slab polygon, a split pair as its strip(s) + its beam on the line
+  at the section's width, a beam drawn twice as not built ("out", greyed) with a note. The "left out"
+  note now asks left_out(e) (it read resolved["scope"] for anything "out" - would fail for drawn twice).
+  Checked: 22/22 suites; review.data builds for every project's latest run. test 6's 16:01 review.html
+  regenerated (review.write, as apply_decisions does). App restarted.
+* 2026-10-27 GAPS IN THE BEAM LINE (user, run test 6 16:12: "the beams are wrongly modeled again"). With the
+  strips right, the 5th floor 5B2 line showed gaps: top Y12-Y13, Y15-Y16, bottom Y20-Y21 - stretches where
+  the reader paired each beam face with the slab edge beside it (two strips, no beam; before, those strips
+  stood as beams and hid it). And 19 re-centred overlapped span 28 by 2.3 m.
+  * linker._beam_line_gaps (end of _section_faces): beams standing on the line (marked/sized, not drawn
+    twice) + split pairs' beam parts, the latter TRIMMED where a span of the line stands at their end
+    (section_parts.beam from/to, along the pair's own direction; export.beam_line applies it). Between
+    two consecutive pieces of one mark, a gap > 2 x W (a column-width break is the column) lined >= 80 % by
+    this section's strips (pure + split) -> a beam there: that mark, the left one's width/depth.
+    Kept on the plan sheet: extra["section_gap_beams"] (cleared each link; deduped across cuts), INFO issue.
+  * export.gap_beam_rows -> beam rows; viewer3d and review.data draw them (ids <sheet>/gap/<n>).
+  * Missing-depth issues also dropped for beams drawn twice and split pairs with no beam part.
+  * NIFT 5th floor: both edges now continuous 5B2 300 x 600 (only column-width breaks), strips beside.
+    Test: stage8 +1.
+* 2026-10-27 EAST END, COLUMN LINES, SLAB EDGE ALONG THE WHOLE BEAM (user: "fix it but dont override anything").
+  * linker._cut_line: the line a cut marks = a crossed beam drawn W and marked/sized; else a beam like that
+    whose line runs through the cut (nearest) - never a pair merely drawn W (NIFT Y23 X1-X2: the cut crossed
+    only the strips; the inner strip, drawn 300, had been taken as the beam). _slab_strips/_section_faces
+    use it; a pair carrying the LINE's own mark at a strip's place and drawn width is that strip ('5B4A'
+    written on the outer strip). _beam_line_gaps: past the line's end beam, where strips line BOTH sides,
+    the beam carries on (Y23 X1-X2 built).
+  * linker._column_ticks: a single line (no width) <= 600 mm lying within 150 mm of one column outline all
+    along = part of the column's drawing: extra["not_a_beam"], not built (export/3D/review), said.
+  * After apply_overrides: a mark/width/depth decided in the review on a slab strip / drawn-twice / not-a-
+    beam line clears that flag - the decision builds it as a beam.
+  * linker._edge_strips (after every cut is read): along the cut's beam line, the plan's own beam-layer
+    lines (sheet beam_lines, readers/linework) where the section puts a CLOSED slab edge -> the strip as far
+    as both run, minus what strips already cover; sheet extra["section_edge_strips"] (area-deduped across
+    cuts); export / 3D / review. NIFT 3rd floor 3B4: the slab edge is one 60 m line, the reader had paired
+    it with one beam piece only -> strip stopped half way; now 9.0 m2 = 150 x 60 m.
+  * Checked: 22/22 suites (715 tests); test 5 (NIFT) only changes (L5 beams 67 -> 61, strips on every floor);
+    test 2, test 3, AKANISTHA unchanged. App restarted.
+  * Then (user screenshot, 5th floor top edge, run 17:14): the inner strip had a 2.8 m hole where the inner
+    slab edge is drawn - _edge_strips only followed the line where a plan ELEMENT stood on the beam line;
+    there the beam was a _beam_line_gaps beam. Now the beam line also takes the gap beams and every stretch
+    where BOTH beam face lines (+-W/2) are drawn (sheet beam_lines). The 10 m with no inner edge drawn (the
+    full S2 slab) stays without strip, as drawn. Checked: 22/22; only NIFT strip rows change (L4, L5).
+* 2026-10-27 A BEAM RUNS AS FAR AS BOTH ITS FACES ARE DRAWN (user screenshot, NIFT 4th floor 4B2 by the stair:
+  "some beams are also incomplete ... fix it in general"). Both faces drawn 4B6A-4B9 (4.85 m); stair lines
+  beside it drew the reader's pair off at 2.8 m.
+  * linker._beam_face_runs (after _column_ticks, every plan with beam_lines): a marked beam with a settled
+    depth whose two face lines (+-w/2, pieces <= 100 apart joined) carry on past its end (or before its start)
+    by > 2w, where no beam already stands over >= half its width (ANY width - Sasan Gir terrace: B4's line runs
+    inside the 750 B2E, whose outer face and inner slope line are 230 apart like B4's faces; a first version
+    counted only same-width beams and wrongly extended B4 4.2 m) -> a piece to where the faces end, its own
+    mark and size, kept in sheet extra section_gap_beams with "why" (export / 3D / review notes use it).
+  * _column_ticks checked on other drawings: test 1 1151 ALL FLOOR (433 mm line inside a 230 x 1960 column),
+    GOA HAAT (400 mm on a 230 x 2630 column's face), Sasan Gir terrace (300 mm on a 300 x 750 column's face) -
+    all column outline lines that were built as red guessed beams. Right.
+  * Checked: 26/26 (716 tests) + all 10 projects: NIFT 4B2 +2038 mm; trial PB Layout GB7 +1626 mm (faces
+    drawn, nothing there); the three column lines; the rest unchanged or the known run-to-run ties. Test:
+    stage8 +1. App restarted.
+* 2026-10-27 (evening) WHOLE-MODEL AUDIT, then four general fixes (user: "still many slab and beams are missing").
+  Scratchpad audit.py (session 3a67bbb2): per floor, drawn beam-layer line pairs 150-760 apart with nothing
+  built along them (beams, columns, walls, slab strips), and slab marks with no slab. NIFT test 6, run 18:17:
+  missing = L2 S3, S3, S4; L3 3B1 top edge (3 x 4.6 m); L4 S2 (stair bay) + 2.1 m east-end band.
+  * linker._reseat_on_faces (after _column_ticks): a marked beam paired from lines whose distance disagrees
+    with its detail/schedule width, where two lines exactly that width apart (one its own) run along 80 %:
+    put between them (section_parts.beam shift + width; width conflict -> READ). With no width given: paired
+    from one SOLID line (slab edge seen from above) and one DASHED (face under the slab) -> its other face is
+    the next dashed line past the dashed one (150-750): width = that distance; the band it was paired from is
+    slab (section_parts strip, thickness = _slab_beside, the slab in the bay beside it; none -> no strip).
+    Loose no-width lines on those faces -> not_a_beam ("a face of beam ..."). Lines grouped within 15 mm
+    (one line drawn in pieces sits a few mm differently bay to bay). NIFT: L3 3B1 (150 -> 300, both spans,
+    + 150 slab band), L4 4B1 (335 -> 300, 3 spans).
+  * linker._slab_edge_bands: an unmarked no-depth pair of one solid + one dashed line whose dashed line is the
+    face of a standing beam = the slab's edge band: slab_strip at the thickness of the slab beyond that beam,
+    and section_edge_strips along wherever the solid edge and that dashed face both run. NIFT L4 east end.
+  * linker._marked_bays (after _beam_face_runs): slab_panels.make only fills bays on plans with NO slab read;
+    now any bay round an unslabbed slab mark, closed by beams (split pairs' beam lines, gap/face-run pieces,
+    snapped to column centres), RC wall element runs, or RC wall lines (two parallel lines 100-450 apart on
+    a WALL/SHEAR layer, not BRICK/BLOCK - readers/linework now keeps them: sheet extra wall_lines, stored
+    only) -> a generated slab "<sid>/slab/b<n>": thickness from a settled slab of that mark on the floor,
+    else its slab schedule row, else missing (red). The bay is the region round the mark (30 m window,
+    lines buffered 5 mm), so two bays meeting at one corner stay two; reaching the window edge = not closed.
+    A bay a slab already covers > 10 % is left. NIFT: L2 S3, S3 (150), S4 (no thickness anywhere: red),
+    L4 S2 (150).
+  * Fresh NIFT analysis + audit: every floor 0 drawn beams missing, 0 slab marks without slab.
+  * Checked: 26/26 (716 tests) + 4 baselines; test 5 / NIFT change only as above; test 2, test 3 (the usual
+    GF/STILT tie), AKANISTHA unchanged. NOT FINISHED (user stopped for the day): the before/after of test 1,
+    test 4, NIFT 2, res, trial (scratchpad fp/cmp12_*.txt, vs after11/after10) - read those first tomorrow.
+  * App restarted on this code (18:5x). User has not yet re-analysed test 6 with it.
+  NEXT: 1) read cmp12 for the 5 projects; 2) user re-analyses test 6 and reviews; 3) open: L4 stair bay by
+  4B2 - a 300 pair beside 4B2 and a +190 line built red (likely SECTION B-B's ledge + a stair line); section
+  depths not written (red until confirmed); founding level for NIFT footings (user decides in the review).
+  User preferences this session: fix GENERALLY (not per project), never break / override, don't re-test
+  again and again (one full check per change), say plainly what is broken before changing when asked.
+* 2026-10-28 the five unfinished comparisons read (cmp12): test 4 / NIFT 2 / res / trial / test 1.
+  Two corrections to _reseat_on_faces, both making it apply LESS:
+  * never moved onto a beam already standing on that line over > 20 % of its length (Akanistha B2: moved
+    onto its 230 faces it lay 0.9 m over the next B2 span) - left as it was. Fresh test 4: unchanged.
+  * the no-width (solid / dashed) case only to a width at least 3 other beams of the plan are drawn at (Sasan
+    Gir hotel 1st floor: an unmarked 230 beam was widened to 415 - a guess). NIFT still: 3B1 x2, 4B1 x3.
+  Accepted after checking: marked-bay slabs in GOA HAAT (S1, S4; pages 5 and 7), res stilt floor (+4),
+  Sasan Gir hotel (+1) and fabrication (+1); the column lines; the known ties (B14, S12, SB, GF/STILT).
+  App restarted. NEXT: user re-analyses test 6 (the 18:46 run predates wall_lines: only S2 of the four
+  new slabs shows in it), then the open items above.
+* 2026-10-28 (session f6c01007) WALL ELEVATIONS, RAFTS AT TWO LEVELS, SECTIONS IN BLOCKS, SHAPED WALLS, BEAM ENDS,
+  REVIT BUILD (project AKANISTHA.new = New block.dwg: 6 plans, column layout, foundation RF1/RF2, SHEAR WALL
+  ELEVATION (SW9 & SW10) and (SW15)). User rule from today: change the app folder DIRECTLY (snapshot first,
+  check after) - no separate test copies (memory: edit-app-directly).
+  * readers/wall_elevations.py (new; readset, also for views found inside blocks): views titled ELEVATION /
+    SECTION naming wall marks: level lines (LEVEL text + the long line it labels; unlabelled lines drawn the
+    same way kept, name ""), scale (1 when a written storey height matches), walls read across every 50 units
+    (faces on COL/WALL/SHEAR/CORE layers paired), linked across slab breaks (<= 1000), marks by labels
+    (one wall + one mark: that), base/top from their faces' ends, outline (polygon), shaped_at (storeys where
+    width varies > 10 % or centre moves > 100), foundation (line at its foot + the one under it). Kept on the
+    sheet: extra["wall_elevation"] - NO elements added (ids unchanged).
+  * linker._wall_heights (after _column_extent): levels -> floors (_match_levels: one to one in order, storey
+    heights checked against the level table incl. Floors-page decisions; else by heights). Per plan wall/column
+    of the mark, its storey: under its base / over its top -> scope READ "other: ..." (not built; review 'this
+    block' builds it; one WARNING 'scope' per plan); base/top inside the storey -> resolved base_mm / top_mm
+    (> 300 mm off). The raft under a wall's base (found on the foundation plan by the wall's mark): every other
+    column/wall standing on it (plans placed on it by export._shift_by_marks) starts on its top. Review
+    decisions (scope / excluded) left alone; a building section's top_mm wins. Idempotent on re-link.
+    AKANISTHA.new: GF 13 on RF2 base +1325 (SW11-17, C7-C12); Service Floor 30 not built (below the rafts).
+  * linker._raft_level: raft founding level = top drawn (via the floor's elevation) - thickness (review's, else
+    the drawn 600 as READ 0.6). A per-raft review decision wins; the PROJECT-wide founding level / Foundation
+    height (source "project decision...") is a fallback for footings the drawings give none - replaced.
+    RF1 -250, RF2 +1075 (250 typed in review; drawn 600). Stale 'missing' issues for it dropped.
+  * linker._column_stops: elements on a *STOP* layer: extra stops_here, INFO 'column stop' per plan (WARNING if
+    the next plan up draws the same COLUMN mark); 3D hover "ends at this floor".
+  * linker._profile_walls: walls an elevation shapes (SW10 arch L1-L2, SW15 lean L1-TERRACE): one placement per
+    wall - the plans moved onto each other (viewer3d.stack), every floor where the plan draws the mark as one
+    straight run; which way round = the direction elevation and plans move it floor to floor (all votes
+    agree); fit k over all floors, a floor > 750 off -> straight. At each floor's level the wall is moved onto
+    that floor's plan (offset spread linearly up the storey) so its beams meet it (checked: storey ends within
+    ~20 mm of the plans). extra profile_wall {origin, dir, thickness, points [[along, up]]}. export row
+    "profile"; Revit build_model.profile_wall (Wall.Create with a closed profile; fallback straight, said);
+    viewer3d + review 3D swept(); ifc_export m.swept across the thickness (Rhino too).
+  * export/_base, viewer3d/_off, ifc, build_model: base_mm (and wall top_mm) used: Revit column base offset,
+    wall base offset/height. review shows base_mm.
+  * 26 Oct work brought in (from scratchpad 8d1f6e94 code_try): sheets/views + registry (sections inside blocks
+    found, id unchanged, kind section/detail), review "Sections and details" list (+ wall elevations' marks),
+    linker_selftest / sheets selftest. NOT brought in: elevations "LEVEL -01 is a name" - it renumbered every
+    element read after it (saved decisions keyed by id). readset: views inside blocks run ONLY
+    wall_elevations.read (no elements -> no renumbering; test 2\test 4 identical). Sheet baseline re-locked
+    (+1 view: entry stair details S3 inside blocks); old one kept as baselines\sheets_expected_2026-10-28_before_sections_in_blocks.json.
+  * beam_ends.onto_supports (export._onto_supports + viewer3d): a beam end touching nothing (> 50 mm) is carried
+    on along its line - a curved one round its own arc (_circle) - onto the first column/wall/CROSSING beam its
+    width meets within 600 mm (overlap >= 0.3 w x 50), to the middle of that bearing. Never into a beam in line
+    (|cos| >= 0.9: that gap is a column's or meant), never shortened, free ends left. AKANISTHA.new open ends
+    36 -> 15 (audit scratchpad ends3d.py, in 3D with z). Other projects: only beam ends moved onto supports
+    (AKANISTHA 34, test 2\test 4 33, test 1 28, trial 36, test 1\test 4 16, res 2, NIFT 1 each).
+    OPEN (user to decide): L2 B1 x2 free 2.5-2.8 m (near SW12 / SW16), B2 x4 by SW19 (L2, L3) free 0.7-0.9 m;
+    5 ends beside a column/wall corner (84-135 mm off line).
+  * Revit build (user built run 14:37 into an unsaved Project1): (1) no level 'Service Floor' (model had
+    'Level 0' at +0 from earlier naming) -> Service Floor and foundations STOPPED. build_model.pick_level /
+    build_extras: no level of that name -> the ONE level within 1 mm of its elevation (levels.json) that is
+    not another drawing level (level_at) - nothing renamed. (2) elements of EARLIER RUNS stayed (replace only
+    used this run folder's placed.json; the new build skipped places they occupied): build_model
+    delete_earlier_runs (runs\*\revit_build\<floor>\placed.json with this model's doc_id, our categories);
+    build_extras records doc_ids and removes earlier runs' foundation elements only (never levels).
+    User told: build into a NEW Revit project from the latest run.
+  * Tests: stage7 +9 (wall elevations, profiles), stage8 +4 (onto supports), revit selftest +3, extras +1.
+    Final: 26/26 groups, 734 tests, all baselines. App restarted (8765).
+  * Scratchpad (session f6c01007): fp_run.py / fp_cmp.py / fp_all.sh (13 projects, before_* = this morning's
+    code), moved.py / moved2.py (beam moves), ends3d.py (beam-end audit), backups backup_profile/, backup_revit/.
+
+## 2026-10-28 (evening, session f6c01007 continued)
+- Shear wall / raft types and concrete (build_model wall_type_for "RCC Shear Wall N mm", build_extras raft_type_for
+  "RCC Raft N mm", NOT_CAST_CONCRETE); column-stop wordings (linker COLUMN_ENDS / COLUMN_STARTS, legend_zones).
+- Decided founding level wins over the slab an elevation draws (_wall_heights: OVERRIDE founding -> INFO, no
+  propagation); a wall drawn down to the elevation's lowest line carries on below.
+- Drawing changed 16:48: "SHEAR WALL ELEVATION (SW15 , SA14 , SW13 ,C12 )", one wall drawn, no labels.
+  * wall_elevations.read: one wall drawn + no label -> every title mark (wall marks + column / unknown-family
+    marks, `also`) gets its own entry, same geometry.
+  * linker._wall_heights: a title mark no plan carries -> the one plan column/wall of its first letter and number
+    not named already (SA14 -> SW14), INFO issue.
+- Leaning (user: "SW13 and C12 should be leaning"; "based on details and sections, not column shift"; "why
+  disjoint again"):
+  * _profile_walls now only finds the elevation's plane (plane["dir"] = sg*u) - and stays the fallback;
+    _section_lean builds every shaped storey: anchored at the plan of the floor under the first leaning storey,
+    the outline's middle along plane, then moved onto each floor's plan at its level (offs, spread up the storey)
+    so beams meet it. WARNING per mark when the plans are > 300 mm off the section (AKANISTHA.new: L2 ~240,
+    L3 ~150, TERRACE ~1.1 m - the drawings disagree). Wall along the plane -> profile_wall; column / wall across
+    -> extra["lean"] {section, base, top} (mm from its plan position, bottom / top).
+  * _up_to_level: a shaped wall's top drawn <= ELEV_TOL_MM under its level goes up to it (SW14/SW15 at TERRACE
+    were 175 short).
+  * A wall on a slab drawn under it whose raft's founding level is OVERRIDE carries on down to the raft (base
+    -inf) - was standing 2.3 m over RF2 on an unbuilt slab. Test changed accordingly (stage7).
+  * Outputs: export._base -> row["lean"]; viewer3d item "ln" + JS leanIt (shear after bake), review lean3;
+    viewer3d _footprints of a shaped wall = its stretch at the top (a beam by SW10 was left 358 mm short);
+    ifc_export m.leaned (oblique IfcExtrudedAreaSolid); rhino_export leaned (closed mesh -> Brep.CreateFromMesh,
+    outline made anticlockwise: faces out); build_model lean_points / slant_angle / lean_column (end-point driven,
+    SLANTED_COLUMN_TYPE_PARAM 2) / lean_wall (WallCrossSection.Slanted, sign read back from its box; along part
+    not built, said). IronPython-safe.
+- Rhino layers by element, then size (user chose option B): Beams::Beam WxD, Columns::Column WxD, Shear walls,
+  Rafts, Slabs...; floor in user text Level. "Walls" -> "Shear walls".
+- Tests: stage7 24, ifc 25 (leaned solid faces out; layers), revit selftest 52 (TestLean). Full suite 22/22,
+  744 tests (before the last three fixes; their groups rerun after). 13-project check: only AKANISTHA.new changed;
+  others identical but for known ties (res B14, trial SB, GF/STILT order in test 1, test 2, test 2\test 3).
+- Snapshots: Documents\Trabeo\backups\snap_2026-10-28_shared_elevation (wall_elevations, linker, stage7 before;
+  rhino_export, ifc_selftest before the layer change). Backup App_2026-10-28_evening.zip. Nothing committed.

@@ -24,6 +24,8 @@ from .source import TextItem, open_drawing, texts_in
 from .views import _DETAIL, View, find_views
 
 TITLE_NEAR = 0.25     # paper text this far (in viewport heights) below/above it is its title
+# what a section or detail drawn inside blocks may be (views.inside_blocks)
+_HELD_KINDS = ("beam_details", "column_details", "slab_details", "footing_details", "stair_details")
 
 
 @dataclass
@@ -243,6 +245,15 @@ def register(path: str, work_dir: str | None = None, log=None) -> list[SheetReco
                 rec.verdict = Verdict("framing_plan", max(rec.verdict.confidence, 0.7),
                                       rec.verdict.reasons + [f"split out under its plan title '{rec.title[:50]}'"],
                                       rec.verdict.scores, [rec.verdict.kind] + list(rec.verdict.also))
+            if v.inside_blocks:
+                # a section or detail drawn inside blocks: the kind its title says, never a plan,
+                # a schedule or a legend - so no floor is read from it
+                kind = next((k for k, pat, _ in WORDS if k in _HELD_KINDS and pat.search(rec.title.upper())),
+                            "section")
+                rec.verdict = Verdict(kind, min(rec.verdict.confidence, 0.6) or 0.6,
+                                      rec.verdict.reasons + [f"a {kind.replace('_', ' ')} drawn inside blocks: "
+                                                             "read as one"],
+                                      rec.verdict.scores, [rec.verdict.kind] + list(rec.verdict.also))
 
         # every source that names a level, title first; disagreement is kept. A plan titled as
         # the top of something ("FRAMING PLAN @ TOP" of the shaft, a mumty, a machine room) is
@@ -319,7 +330,8 @@ def to_building(records: list[SheetRecord], building):
                 "view": {"source": r.view.source, "window": list(r.view.window),
                          "scale": r.view.scale, "entities": len(r.view.handles),
                          "same_as": r.view.same_as,
-                         **({"twin": r.view.twin, "split_from": r.view.split_from} if r.view.twin else {})},
+                         **({"twin": r.view.twin, "split_from": r.view.split_from} if r.view.twin else {}),
+                         **({"inside_blocks": True} if r.view.inside_blocks else {})},
                 "title_from": r.title_from, "prominent": r.prominent,
                 "kind": {"value": r.verdict.kind, "confidence": r.verdict.confidence,
                          "reasons": r.verdict.reasons, "scores": r.verdict.scores},

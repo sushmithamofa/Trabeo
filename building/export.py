@@ -254,6 +254,73 @@ def _section(row, e, rep, what, prov) -> bool:
     return True
 
 
+def strip_outline(e, part: dict | None = None) -> list | None:
+    """The outline of a slab strip read as a beam (linker._slab_strips, or one part of a pair
+    linker._section_faces split): its width across the line it was drawn as, moved to where
+    the section puts it."""
+    s, g = part or e.extra.get("slab_strip"), e.geometry
+    if not s or not g.get("start") or not g.get("end"):
+        return None
+    (ax, ay), (cx, cy) = g["start"][:2], g["end"][:2]
+    L = math.hypot(cx - ax, cy - ay)
+    if L <= 0:
+        return None
+    nx, ny = -(cy - ay) / L, (cx - ax) / L
+    m, h = float(s.get("shift") or 0.0), float(s["width"]) / 2.0
+    return [[ax + nx * (m - h), ay + ny * (m - h)], [cx + nx * (m - h), cy + ny * (m - h)],
+            [cx + nx * (m + h), cy + ny * (m + h)], [ax + nx * (m + h), ay + ny * (m + h)]]
+
+
+def beam_line(e) -> tuple | None:
+    """Where a pair split by linker._section_faces has its beam: (start, end), moved onto the
+    beam's line; None where it has no beam part."""
+    sp, g = e.extra.get("section_parts"), e.geometry
+    if not sp or not sp.get("beam") or not g.get("start") or not g.get("end"):
+        return None
+    (ax, ay), (cx, cy) = g["start"][:2], g["end"][:2]
+    L = math.hypot(cx - ax, cy - ay) or 1.0
+    m = float(sp["beam"]["shift"])
+    nx, ny = -(cy - ay) / L * m, (cx - ax) / L * m
+    # where a span of the line already stands at an end, it starts / stops there
+    t0, t1 = float(sp["beam"].get("from", 0.0)), float(sp["beam"].get("to", L))
+    ux, uy = (cx - ax) / L, (cy - ay) / L
+    return [ax + nx + ux * t0, ay + ny + uy * t0], [ax + nx + ux * t1, ay + ny + uy * t1]
+
+
+def gap_beam_rows(s) -> list[dict]:
+    """The beams linker._beam_line_gaps found where only their slab strips were paired."""
+    return [{"mark": g["mark"], "kind": "beam", "start": list(g["start"]), "end": list(g["end"]), "mid": None,
+             "width": float(g["width"]), "width_source": f"section {g['section']}", "depth": float(g["depth"]),
+             "depth_source": f"beam {g['mark']}", "top_mm": 0.0, "source_layer": "", "handle": "",
+             "centreline_source": "section", "offset_applied": 0.0,
+             "notes": [f"beam {g['mark']}: " + (g.get("why") or f"only its slab strips were paired there (both its "
+                       f"faces drawn); their inner edges are its faces (section {g['section']})") + " (stage 8)"]}
+            for g in s.extra.get("section_gap_beams") or []]
+
+
+def _strip_slab(row, e, rep, what, prov, part: dict | None = None) -> dict | None:
+    """A slab strip read as a beam, written as the slab it is: the section's slab thickness.
+    A thickness only measured off the section is a working value: built marked, or held."""
+    s = dict(part, section=e.extra["section_parts"]["section"]) if part else e.extra["slab_strip"]
+    out = {"mark": "", "outline": strip_outline(e, part), "holes": [], "thickness": float(s["thickness"]),
+           "thickness_source": f"section {s['section']}", "sunk_mm": 0.0,
+           "source_layer": row.get("source_layer", ""), "handle": row.get("handle", ""),
+           "notes": [f"the slab section {s['section']} draws beside the beam, drawn on the plan as lines "
+                     f"read as a {s['width']:.0f} wide beam (stage 8)"]}
+    if not out["outline"]:
+        return None
+    if not s.get("written"):
+        note = f"section {s['section']}: slab thickness measured, not written"
+        if prov is None:
+            rep.hold(what, [note])
+            return None
+        out["provisional"] = note
+        rep.provisional.append(f"{what}: {note}")
+    rep.added.append(f"{what}: the slab section {s['section']} draws beside the beam - built as a "
+                     f"{s['width']:.0f} wide, {s['thickness']:.0f} thick slab strip, not a beam")
+    return out
+
+
 def _heights(row, e, rep, what) -> list:
     """A beam's height from a building section (linker._section_heights): its top off the
     level, or - sloping with a slab - its pieces, each from one height to the next (the
@@ -278,6 +345,64 @@ def _heights(row, e, rep, what) -> list:
     rep.added.append(f"{what}: slopes with the slab (building section) - {len(out)} piece(s), "
                      + ", ".join(f"{z:+.0f}" for _, z in prof) + " mm")
     return out
+
+
+def _base(row, e, rep, what, top=False) -> None:
+    """Where a column or wall starts above the level below (base_mm) - and, for a wall,
+    ends off its own level (top_mm) - as a wall elevation draws it (linker._wall_heights)."""
+    for k in ("base_mm", "top_mm") if top else ("base_mm",):
+        v = e.resolved.get(k)
+        if v is not None and v.status in USABLE and v.value:
+            row[k] = float(v.value)
+            rep.added.append(f"{what}: {'starts' if k == 'base_mm' else 'ends'} {row[k]:+.0f} mm from the level "
+                             f"{'below' if k == 'base_mm' else ''} ({v.evidence[0].source if v.evidence else 'wall elevation'})"
+                             .replace("  ", " "))
+    ln = e.extra.get("lean")
+    if ln:
+        # leaning as a wall elevation draws it (linker._section_lean): its bottom and top, mm
+        # across from where its plan draws it
+        row["lean"] = {"base": list(ln["base"]), "top": list(ln["top"])}
+        rep.added.append(f"{what}: leaning as {ln['section']} draws it, its top "
+                         f"{math.dist(ln['base'], ln['top']):.0f} mm across from its bottom")
+
+
+def footprints(cols, walls) -> list:
+    """The columns' and walls' footprints of one floor (export rows), as shapely shapes."""
+    from shapely.geometry import LineString, Polygon
+    out = []
+    for c in cols:
+        if len(c.get("outline") or []) >= 3:
+            out.append(Polygon([p[:2] for p in c["outline"]]).buffer(0))
+        elif c.get("x") is not None and c.get("width") and c.get("depth"):
+            r = math.radians(float(c.get("rotation") or 0.0))
+            ex, ey, w, d_ = math.cos(r), math.sin(r), float(c["width"]), float(c["depth"])
+            out.append(Polygon([(c["x"] + u * ex - v * ey, c["y"] + u * ey + v * ex)
+                                for u, v in ((-d_ / 2, -w / 2), (d_ / 2, -w / 2), (d_ / 2, w / 2), (-d_ / 2, w / 2))]))
+    for w in walls:
+        if len(w.get("outline") or []) >= 3:
+            out.append(Polygon([p[:2] for p in w["outline"]]).buffer(0))
+        elif w.get("start") and w.get("end") and w.get("thickness"):
+            out.append(LineString([w["start"][:2], w["end"][:2]]).buffer(float(w["thickness"]) / 2, cap_style=2))
+    return [g for g in out if not g.is_empty]
+
+
+def _onto_supports(beams, cols, walls, rep) -> None:
+    """A beam end stopping short of the column, wall or beam that carries it is carried on
+    onto it (beam_ends.onto_supports): it sits on its support, Revit joins it, the load has
+    its path. A curved beam is carried on round its own arc."""
+    from building.beam_ends import onto_supports
+    on = [r for r in beams if r.get("start") and r.get("end") and r.get("width")]
+    moved = onto_supports([(r["start"], r["end"], r["width"]) + ((r["mid"],) if r.get("mid") else ()) for r in on],
+                          footprints(cols, walls))
+    for r, new in zip(on, moved):
+        for k, key in enumerate(("start", "end")):
+            if new[k] is not None:
+                gap = math.dist(r[key][:2], new[k][:2])
+                rep.added.append(f"beam {r.get('mark') or '(no mark)'} at ({r[key][0]:.0f}, {r[key][1]:.0f}): its "
+                                 f"{key} carried on {gap:.0f} mm onto what carries it - it stopped short")
+                r[key] = new[k]
+        if new[2] is not None:
+            r["mid"] = new[2]
 
 
 def _patch_mark(row, e, rep, what):
@@ -338,6 +463,12 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
         if tv is not None and tv.status in USABLE and tv.value is not None:
             row["top_mm"] = float(tv.value)              # ends under a lowered beam (building section)
             rep.added.append(f"{what}: ends {row['top_mm']:+.0f} mm from the level (building section)")
+        _base(row, e, rep, what)
+        kv = e.resolved.get("kind")
+        if kv is not None and kv.status in USABLE and kv.value and kv.value != row.get("kind"):
+            # linker._column_extent: the column schedule starts it at this level
+            rep.change(what, "kind", row.get("kind"), kv.value, _why(e, "kind"))
+            row["kind"] = kv.value
         cols.append(row)
 
     # beams, and the marked spans of split ones. A beam drawn with three lines (two read
@@ -356,11 +487,38 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
         pairs.append((r, e))
         rep.added.append(f"beam {e.final('mark') or '?'} at ({r['start'][0]:.0f}, {r['start'][1]:.0f}): "
                          f"{len(e.extra['merged_from'])} lines drawn for one beam -> one {e.get('width'):.0f} wide beam")
+    strips = []                    # slab strips read as beams (linker._slab_strips)
     for row, e in pairs:
         what = f"beam {e.final('mark') or row.get('mark') or '?'}"
         if e.resolved.get("excluded"):
             rep.left_out.append(f"{what}: excluded in the review")
             continue
+        if e.extra.get("slab_strip") and not e.extra.get("split_into"):
+            # (it may carry the mark of the beam beside it, written on it: linker._slab_strips)
+            got = _strip_slab(row, e, rep, what, prov)
+            if got:
+                strips.append(got)
+            continue
+        if e.extra.get("same_beam_as") and not e.extra.get("split_into"):
+            rep.left_out.append(f"{what}: the same beam drawn twice on the line a section marks - built once "
+                                f"({e.extra['same_beam_as'].rsplit('/', 1)[-1]})")
+            continue
+        if e.extra.get("not_a_beam") and not e.extra.get("split_into"):
+            rep.left_out.append(f"{what}: {e.extra['not_a_beam']}")         # linker._column_ticks
+            continue
+        sp = e.extra.get("section_parts") if not e.extra.get("split_into") else None
+        if sp:
+            # a pair of lines that is the beam and the slab beside it (linker._section_faces)
+            for part in sp["strips"]:
+                got = _strip_slab(row, e, rep, what, prov, part)
+                if got:
+                    strips.append(got)
+            line = beam_line(e)
+            if line is None:
+                continue
+            row = dict(row, start=list(line[0]), end=list(line[1]))
+            rep.added.append(f"{what}: on its line at {sp['beam']['width']:.0f} wide, as section {sp['section']} "
+                             "draws it (the plan's wider pair took in the slab beside it)")
         parts = spans.get(e.id) if e.extra.get("split_into") else None
         if parts:
             for sp in parts:
@@ -386,6 +544,10 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
         if not _in_scope(row, e, rep, what, prov) or not _section(row, e, rep, what, prov):
             continue
         beams += _heights(row, e, rep, what)
+    for r in gap_beam_rows(b.sheets[sid]) if sid in b.sheets else []:
+        beams.append(r)
+        rep.added.append(f"beam {r['mark']} ({r['start'][0]:.0f}, {r['start'][1]:.0f}): built where only its slab "
+                         f"strips were paired, both its faces drawn ({r['width']:.0f} x {r['depth']:.0f})")
 
     # slabs
     slabs = []
@@ -432,6 +594,23 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
             row["slope"] = dict(e.extra["slope"])
         slabs.append(row)
         rep.added.append(f"{what}: {len(e.geometry['outline'])}-sided panel, {t:.0f} thick")
+    slabs += strips
+    # the slab strip along a drawn slab edge, where the plan reader paired none (linker._edge_strips)
+    for g in (b.sheets[sid].extra.get("section_edge_strips") or []) if sid in b.sheets else []:
+        what = f"slab strip of section {g['section']} along the drawn slab edge"
+        row = {"mark": "", "outline": [list(p) for p in g["outline"]], "holes": [], "thickness": float(g["thickness"]),
+               "thickness_source": f"section {g['section']}", "sunk_mm": 0.0, "source_layer": "", "handle": "",
+               "notes": [f"the slab section {g['section']} draws beside the beam, along the slab edge drawn on the "
+                         "plan (stage 8)"]}
+        if not g.get("written"):
+            note = f"section {g['section']}: slab thickness measured, not written"
+            if prov is None:
+                rep.hold(what, [note])
+                continue
+            row["provisional"] = note
+            rep.provisional.append(f"{what}: {note}")
+        slabs.append(row)
+        rep.added.append(f"{what}: {g['width']:.0f} wide, {g['thickness']:.0f} thick")
 
     # walls: RC walls stay walls; columns drawn as odd shapes become columns
     walls = []
@@ -464,6 +643,7 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
                  "notes": ["a column drawn as an odd shape; exported as a column (stage 8)"]}
             if not _in_scope(c, e, rep, what, prov):
                 continue
+            _base(c, e, rep, what, top=True)
             cols.append(c)
             rep.added.append(f"{what} -> column {c['mark'] or '(no mark)'} {c['width']:.0f} x {c['depth']:.0f} "
                              f"at ({c['x']:.0f}, {c['y']:.0f}) instead of {len(e.extra.get('runs') or [])} wall pieces")
@@ -488,6 +668,13 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
             continue
         if not _in_scope(row, e, rep, what, prov):
             continue
+        _base(row, e, rep, what, top=True)
+        pw = e.extra.get("profile_wall")
+        if pw:
+            # built to the shape a wall elevation draws (linker._profile_walls): a profile wall
+            row["profile"] = {k: pw[k] for k in ("origin", "dir", "thickness", "points")}
+            row["thickness"] = row.get("thickness") or pw["thickness"]
+            rep.added.append(f"{what}: built to the shape {pw['section']} draws ({len(pw['points'])}-point profile)")
         walls.append(row)
 
     # hidden beams (folds): their depth comes from the slabs either side; one sized on
@@ -514,6 +701,7 @@ def export_plan(b: Building, sid: str, provisional: bool = False,
         folds.append(f)
     if "folds" in d:
         d["folds"] = folds
+    _onto_supports(beams, cols, walls, rep)
     d["columns"], d["beams"], d["slabs"], d["walls"] = cols, beams, slabs, walls
     d["counts"] = {k: v for k, v in _counts(d).items() if k in (d.get("counts") or _counts(d))}
     d["export"] = {"from": "building.export (stage 8)", "plan": sid,

@@ -65,6 +65,51 @@ def _num(e, p, default=None):
     return float(x) if isinstance(x, (int, float)) else default
 
 
+def _footprints(items) -> list:
+    """The columns' and walls' footprints among one floor's items, as shapely shapes."""
+    from shapely.geometry import LineString, Polygon
+    out = []
+    for it in items:
+        if it["t"] == "column":
+            r = math.radians(float(it.get("rot") or 0.0))
+            ex, ey, w, d_ = math.cos(r), math.sin(r), it["w"], it["d"]
+            out.append(Polygon([(it["x"] + u * ex - v * ey, it["y"] + u * ey + v * ex)
+                                for u, v in ((-d_ / 2, -w / 2), (d_ / 2, -w / 2), (d_ / 2, w / 2), (-d_ / 2, w / 2))]))
+        elif it["t"] == "wall" and it.get("sec"):
+            # a shaped wall: a -> b across it, its profile along it (u); its beams meet its top, so
+            # its stretch there (a leaning wall is wider over its storey than at its top)
+            (ax, ay), (bx, by) = it["a"], it["b"]
+            t = math.hypot(bx - ax, by - ay) or 1.0
+            fx, fy = (bx - ax) / t, (by - ay) / t
+            u0, u1 = min(p[0] for p in it["sec"]), max(p[0] for p in it["sec"])
+            try:
+                poly = Polygon(it["sec"]).buffer(0)
+                y = poly.bounds[3] - 50.0
+                cut = poly.intersection(LineString([(u0 - 1.0, y), (u1 + 1.0, y)]))
+                if not cut.is_empty and cut.bounds[2] - cut.bounds[0] > 1.0:
+                    u0, u1 = cut.bounds[0], cut.bounds[2]
+            except Exception:
+                pass
+            out.append(Polygon([(ax - fy * u0, ay + fx * u0), (ax - fy * u1, ay + fx * u1),
+                                (bx - fy * u1, by + fx * u1), (bx - fy * u0, by + fx * u0)]))
+        elif it["t"] == "wall":
+            out.append(LineString([it["a"], it["b"]]).buffer(it["w"] / 2, cap_style=2))
+    return out
+
+
+def _off(e, p) -> float:
+    """A column's or wall's base / top off its levels (linker._wall_heights), else 0."""
+    v = e.resolved.get(p)
+    return float(v.value) if v is not None and v.status in ("read", "override") and v.value else 0.0
+
+
+def _lean(item, ln) -> None:
+    """A column or wall leaning as a wall elevation draws it (linker._section_lean): its bottom
+    and top moved across by ln's base / top (mm), drawn sheared between them."""
+    item["ln"] = [ln["base"][0], ln["base"][1], ln["top"][0], ln["top"][1]]
+    item["info"] += f", leaning as {ln['section']}"
+
+
 def _plan_shifts(b, plans):
     """Offset of each plan onto the first (lowest) one: {sid: (dx, dy) or None}."""
     from building.linker import _shift
@@ -377,7 +422,7 @@ def _scene(b, set_key, plans, shifts, fd, table, decided, decisions) -> dict:
                 w, d = _num(e, "width", 230.0), _num(e, "depth", 450.0)
                 # a floating column (FC) stands on its girder at this level and rises to the
                 # next, as the Revit build places it - not from the level below
-                fl = e.get("kind") == "column_float" or mark.upper().startswith("FC")
+                fl = e.final("kind") == "column_float" or mark.upper().startswith("FC")
                 x, y = g["x"] + sh[0], g["y"] + sh[1]
                 if FC_CARRY_ON and fl and any(abs(x - bx) + abs(y - by) <= SAME_PLACE for bx, by in below_fc):
                     # the floor below's FC carrying on, already standing up to this floor: one
@@ -390,13 +435,48 @@ def _scene(b, set_key, plans, shifts, fd, table, decided, decisions) -> dict:
                               and tv.status in ("read", "override") else 0.0)
                 items.append({"id": e.id, "t": "column", "x": x, "y": y, "w": w, "d": d,
                               "rot": float(g.get("rotation") or 0.0),
-                              "z0": top if fl else low, "z1": above[k] if fl else ctop,
+                              "z0": top if fl else low + _off(e, "base_mm"), "z1": above[k] if fl else ctop,
                               "s": _status(e, ("mark", "width", "depth")), "m": mark,
                               "info": f"{'floating column, ' if fl else ''}{w:.0f} x {d:.0f}", "lv": k})
                 if e.extra.get("diameter") and abs(w - d) <= 1.0:
                     # drawn as a circle: shown round, as the Revit build makes it
                     items[-1]["rd"] = w
                     items[-1]["info"] = f"{'floating column, ' if fl else ''}round, {w:.0f} across"
+                if e.extra.get("stops_here"):
+                    items[-1]["info"] += ", ends at this floor (column-stop layer)"
+                if e.extra.get("lean") and not fl:
+                    _lean(items[-1], e.extra["lean"])
+            elif e.type == "beam" and e.extra.get("slab_strip") and g.get("start"):
+                # the slab a section draws beside its beam, drawn as lines read as a beam: the
+                # slab strip it is, as the export builds it (export._strip_slab)
+                from building.export import strip_outline
+                strip, p = e.extra["slab_strip"], strip_outline(e)
+                if p:
+                    items.append({"id": e.id, "t": "slab", "p": [[x + sh[0], y + sh[1]] for x, y in p], "z": top,
+                                  "th": float(strip["thickness"]), "s": "read" if strip.get("written") else "low",
+                                  "m": "", "info": f"slab strip of section {strip['section']}, {strip['width']:.0f} "
+                                                   f"wide, {strip['thickness']:.0f} thick", "lv": k})
+            elif e.type == "beam" and (e.extra.get("same_beam_as") or e.extra.get("not_a_beam")):
+                pass                                # drawn twice, or part of a column: not built, as the export
+            elif e.type == "beam" and e.extra.get("section_parts") and g.get("start") and g.get("end"):
+                # a pair of lines that is the beam and the slab beside it (linker._section_faces)
+                from building.export import beam_line, strip_outline
+                sp = e.extra["section_parts"]
+                for part in sp["strips"]:
+                    p = strip_outline(e, part)
+                    if p:
+                        items.append({"id": e.id, "t": "slab", "p": [[x + sh[0], y + sh[1]] for x, y in p],
+                                      "z": top, "th": float(part["thickness"]),
+                                      "s": "read" if part.get("written") else "low", "m": "",
+                                      "info": f"slab strip of section {sp['section']}, {part['width']:.0f} wide, "
+                                              f"{part['thickness']:.0f} thick", "lv": k})
+                line = beam_line(e)
+                if line:
+                    w, d = _num(e, "width", 230.0), _num(e, "depth", 450.0)
+                    items.append({"id": e.id, "t": "beam", "a": [line[0][0] + sh[0], line[0][1] + sh[1]],
+                                  "b": [line[1][0] + sh[0], line[1][1] + sh[1]], "w": w, "d": d, "z": top,
+                                  "s": _status(e, ("mark", "width", "depth")), "m": mark,
+                                  "info": f"{w:.0f} x {d:.0f}, as section {sp['section']}", "lv": k})
             elif e.type in ("beam", "beam_span", "fold") and g.get("start") and g.get("end"):
                 hidden = e.type == "fold"           # the concealed / hidden beam at a sunk step
                 w, d = _num(e, "width", 230.0), _num(e, "depth", 450.0)
@@ -415,6 +495,7 @@ def _scene(b, set_key, plans, shifts, fd, table, decided, decisions) -> dict:
                     from building.ifc_export import arc_band
                     items[-1]["p"] = [[round(x, 1), round(y, 1)] for x, y in arc_band(
                         items[-1]["a"], (g["mid"][0] + sh[0], g["mid"][1] + sh[1]), items[-1]["b"], w)]
+                    items[-1]["mid"] = [g["mid"][0] + sh[0], g["mid"][1] + sh[1]]
                 # its height from a building section: off the level, or sloping in pieces
                 tv = e.resolved.get("top_mm") if not hidden else None
                 if tv is not None and tv.value is not None and tv.status in ("read", "override"):
@@ -437,12 +518,51 @@ def _scene(b, set_key, plans, shifts, fd, table, decided, decisions) -> dict:
                     items[-1]["sl"] = {"o": [sl["origin"][0] + sh[0], sl["origin"][1] + sh[1]], "d": sl["dir"],
                                        "p0": sl["p0"], "z0": sl["z0"], "p1": sl["p1"], "z1": sl["z1"]}
                     items[-1]["info"] += f", sloping {sl['z0']:+.0f} to {sl['z1']:+.0f}"
+            elif e.type == "wall" and e.extra.get("profile_wall") and e.final("role") != "masonry":
+                # the shape a wall elevation draws (linker._profile_walls), carried across its thickness
+                pw = e.extra["profile_wall"]
+                (ox, oy), (ux, uy), t = pw["origin"], pw["dir"], pw["thickness"]
+                nx, ny = uy * t / 2, -ux * t / 2                    # across the wall: its profile on the left
+                items.append({"id": e.id, "t": "wall", "a": [ox - nx + sh[0], oy - ny + sh[1]],
+                              "b": [ox + nx + sh[0], oy + ny + sh[1]], "sec": pw["points"], "z": low,
+                              "s": _status(e, ("width",)), "m": mark,
+                              "info": f"shaped as {pw['section']}, {t:.0f} thick", "lv": k})
             elif e.type == "wall" and e.extra.get("runs") and e.final("role") != "masonry":
                 for r in e.extra["runs"]:
                     items.append({"id": e.id, "t": "wall", "a": [r["start"][0] + sh[0], r["start"][1] + sh[1]],
                                   "b": [r["end"][0] + sh[0], r["end"][1] + sh[1]], "w": r["thickness"],
-                                  "z0": low, "z1": top, "s": _status(e, ("width",)), "m": mark,
-                                  "info": f"{e.final('shape') or ''} {r['thickness']:.0f} thick", "lv": k})
+                                  "z0": low + _off(e, "base_mm"), "z1": top + _off(e, "top_mm"),
+                                  "s": _status(e, ("width",)), "m": mark,
+                                  "info": f"{e.final('shape') or ''} {r['thickness']:.0f} thick"
+                                          + (", ends at this floor (column-stop layer)" if e.extra.get("stops_here") else ""),
+                                  "lv": k})
+                    if e.extra.get("lean"):
+                        _lean(items[-1], e.extra["lean"])
+        # the slab strip along a drawn slab edge (linker._edge_strips), as the export
+        for gi, g in enumerate(s.extra.get("section_edge_strips") or []):
+            items.append({"id": f"{sid}/edge/{gi}", "t": "slab", "p": [[x + sh[0], y + sh[1]] for x, y in g["outline"]],
+                          "z": top, "th": float(g["thickness"]), "s": "read" if g.get("written") else "low", "m": "",
+                          "info": f"slab strip of section {g['section']} along the drawn slab edge, "
+                                  f"{g['width']:.0f} wide, {g['thickness']:.0f} thick", "lv": k})
+        # beams where only their slab strips were paired (linker._beam_line_gaps), as the export
+        for gi, g in enumerate(s.extra.get("section_gap_beams") or []):
+            items.append({"id": f"{sid}/gap/{gi}", "t": "beam", "a": [g["start"][0] + sh[0], g["start"][1] + sh[1]],
+                          "b": [g["end"][0] + sh[0], g["end"][1] + sh[1]], "w": float(g["width"]),
+                          "d": float(g["depth"]), "z": top, "s": "read", "m": str(g["mark"]),
+                          "info": f"{g['width']:.0f} x {g['depth']:.0f}, " + (g.get("why") or "only its slab strips "
+                                  f"were paired there (section {g['section']})"), "lv": k})
+        # a beam end stopping short of what carries it is carried on onto it, as the export does
+        from building.beam_ends import onto_supports
+        on = [it for it in items[n_sheet:] if it["t"] == "beam" and it.get("w") and (it.get("mid") or not it.get("p"))]
+        for it, new in zip(on, onto_supports([(it["a"], it["b"], it["w"]) + ((it["mid"],) if it.get("mid") else ())
+                                              for it in on], _footprints(items[n_sheet:]))):
+            for key, nw in zip(("a", "b"), new):
+                if nw is not None:
+                    it[key] = nw
+            if new[2] is not None:                          # a curved beam carried on round its arc
+                from building.ifc_export import arc_band
+                it["mid"] = new[2]
+                it["p"] = [[round(x, 1), round(y, 1)] for x, y in arc_band(it["a"], it["mid"], it["b"], it["w"])]
         # beams turning an L corner are drawn on to fill it, as Revit joins them
         from building.beam_ends import corner_extensions, carried
         straight = [it for it in items[n_sheet:] if it["t"] == "beam" and not it.get("p")
@@ -590,6 +710,12 @@ function cyl(x,y,dia,z0,z1,it){const h=Math.max(M(z1-z0),0.01),m=new THREE.Mesh(
 function prism(pts,z0,z1,it){const sh=new THREE.Shape(pts.map(p=>new THREE.Vector2(M(p[0]),M(p[1]))));
  const g=new THREE.ExtrudeGeometry(sh,{depth:Math.max(M(z1-z0),0.01),bevelEnabled:false});
  const m=new THREE.Mesh(g,mat(it.s,it.t));m.rotation.x=-Math.PI/2;m.position.y=M(z0);return m}
+// leaning as a wall elevation draws it: bottom moved by ln[0..1], top by ln[2..3] (mm), sheared between
+function leanIt(m,it){m.updateMatrix();const g=m.geometry.clone();g.applyMatrix4(m.matrix);
+ const p=g.attributes.position,lo=M(it.z0),H=Math.max(M(it.z1)-lo,1e-6),l=it.ln;
+ for(let i=0;i<p.count;i++){const t=Math.min(Math.max((p.getY(i)-lo)/H,0),1);
+  p.setX(i,p.getX(i)+M(l[0]+(l[2]-l[0])*t));p.setZ(i,p.getZ(i)-M(l[1]+(l[3]-l[1])*t))}
+ p.needsUpdate=true;g.computeVertexNormals();return new THREE.Mesh(g,m.material)}
 function domAng(segs){const h={};let tot=0,best=0,bw=0;for(const [a,b] of segs){const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);if(L<1)continue;
  let t=((Math.atan2(dy,dx)*180/Math.PI)%90+90)%90;if(t>45)t-=90;const k=Math.round(t*2)/2;h[k]=(h[k]||0)+L;tot+=L;if(h[k]>bw){bw=h[k];best=k}}
  return (Math.abs(best)<0.25||bw<0.4*tot)?0:best}
@@ -600,10 +726,10 @@ function build(si){if(group)scene.remove(group);group=new THREE.Group();meshes=[
   else if(it.t==='footing')m=it.p?prism(it.p,it.z0,it.z1,it):box(it.x,it.y,it.w,it.d,it.rot,it.z0,it.z1,it);
   else if(it.t==='beam')m=it.sec?swept(it.a,it.b,it.sec,it.z,it):it.p?prism(it.p,it.z-it.d,it.z,it):
    (it.z2!==undefined&&Math.abs(it.z2-it.z)>1)?slant(it.a,it.b,it.w,it.z,it.z2,it.d,it):bar(it.a,it.b,it.w,it.z-it.d,it.z,it);
-  else if(it.t==='wall')m=bar(it.a,it.b,it.w,it.z0,it.z1,it);
+  else if(it.t==='wall')m=it.sec?swept(it.a,it.b,it.sec,it.z,it):bar(it.a,it.b,it.w,it.z0,it.z1,it);
   else if(it.t==='slab')m=it.sl?slopedSlab(it.p,it.sl,it.z,it.th,it):prism(it.p,it.z-it.th,it.z,it);
   else if(it.t==='stair')m=prism(it.p,it.z0,it.z0+(it.z1-it.z0)/2,it);
-  if(!m)continue;m.userData=it;m.visible=shown[it.t];group.add(m);meshes.push(m)}
+  if(!m)continue;if(it.ln)m=leanIt(m,it);m.userData=it;m.visible=shown[it.t];group.add(m);meshes.push(m)}
  // a plan drawn a few degrees off square (a turned UCS) is shown square - display only
  group.rotation.y=-domAng(S.items.filter(it=>it.t==='beam').map(it=>[it.a,it.b]))*Math.PI/180;
  scene.add(group);group.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(group),c=bb.getCenter(new THREE.Vector3()),

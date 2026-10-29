@@ -292,7 +292,7 @@ def _lift_helpers():
     import ast
     src = os.path.join(os.path.dirname(os.path.abspath(globals().get("__file__") or ".")), "build_model.py")
     want = ("collect", "levels", "neighbour_level", "_setp", "set_floor_offset", "set_comment", "set_mark",
-            "_concrete_first", "concrete_material", "_single_layer", "_is_single_layer",
+            "_concrete_first", "NOT_CAST_CONCRETE", "concrete_material", "_single_layer", "_is_single_layer",
             "floor_type_for", "slab_loop_points", "set_size", "base_symbol", "collect_same_family",
             "activate", "TypeCache", "SIZE_PARAMS",
             "eid", "BEAM_COLOURS", "_solid_fill_id", "_equals_rule", "_filter_views",
@@ -395,8 +395,124 @@ def _write(path, text):
         f.write(text)
 
 
+def raft_type_for(thickness_mm, cache):
+    """A raft is a foundation slab (Structural Foundations), not a floor: a foundation slab
+    type exactly this thick, one concrete layer, named "RCC Raft 250 mm" - reused if in the
+    model, else made from a foundation slab type there. A model with no foundation slab type
+    at all gets the structural floor type (floor_type_for), said once."""
+    key = ("raft", int(round(thickness_mm)))
+    if key in cache:
+        return cache[key]
+    name = "RCC Raft %d mm" % key[1]
+    found = []
+    for ft in collect(BuiltInCategory.OST_StructuralFoundation) + collect(BuiltInCategory.OST_Floors):
+        try:
+            if getattr(ft, "IsFoundationSlab", False):
+                found.append(ft)
+        except Exception:
+            continue
+    concrete = concrete_material()
+    existing = next((ft for ft in found if ft.Name == name), None)
+    if existing is not None:
+        if not _is_single_layer(existing, thickness_mm, concrete):
+            _single_layer(existing, thickness_mm, concrete)
+        cache[key] = existing
+        return existing
+    for ft in _concrete_first(found, lambda f: f.Name):
+        new = None
+        try:
+            new = ft.Duplicate(name)
+            if _single_layer(new, thickness_mm, concrete):
+                cache[key] = new
+                return new
+        except Exception:
+            pass
+        if new is not None:
+            try:
+                doc.Delete(new.Id)
+            except Exception:
+                pass
+    if not cache.get("said"):
+        say("NOTE     No foundation slab type in this model (Structure > Foundation: Slab): the rafts are built "
+            "as structural floors. Load or make one and build again to have them as foundations.")
+        cache["said"] = True
+    cache[key] = floor_type_for(thickness_mm, cache)
+    return cache[key]
+
+
 def _placed_file(src):
     return os.path.join(os.path.dirname(src), "placed_extras.json")
+
+
+def _doc_id(doc):
+    """This very model's fingerprint (its Project Information's UniqueId), or ""."""
+    try:
+        return str(doc.ProjectInformation.UniqueId or "")
+    except Exception:
+        return ""
+
+
+def _delete_earlier_runs(doc, src):
+    """Take out the footings, rafts, pedestals and stairs earlier runs of this project placed
+    for this plan IN THIS VERY MODEL (their record carries this model's fingerprint): each
+    Analyse makes a new run folder, so the previous build is often recorded in another one.
+    Levels are never taken out; records with no fingerprint, or another model's, are left."""
+    import glob as _glob
+    me = _doc_id(doc)
+    if not me:
+        return 0
+    here = os.path.dirname(os.path.abspath(src))
+    runs = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    own = os.path.normcase(os.path.abspath(_placed_file(src)))
+    key = doc.PathName or doc.Title
+    kinds = set()
+    for bic in ("OST_StructuralFoundation", "OST_Floors", "OST_StructuralColumns", "OST_Stairs", "OST_StairsRailing"):
+        try:
+            kinds.add(int(getattr(BuiltInCategory, bic)))
+        except Exception:
+            pass
+    gone = 0
+    for path in _glob.glob(os.path.join(runs, "*", "revit_build", os.path.basename(here), "placed_extras.json")):
+        if os.path.normcase(os.path.abspath(path)) == own:
+            continue
+        try:
+            with io.open(path, encoding="utf-8") as f:
+                rec = json.load(f)
+        except Exception:
+            continue
+        if (rec.get("doc_ids") or {}).get(key) != me:
+            continue
+        for uid in rec.get(key) or []:
+            el = doc.GetElement(uid)
+            if el is None:
+                continue
+            try:
+                cid = el.Category.Id
+                cnum = int(cid.Value) if hasattr(cid, "Value") else int(cid.IntegerValue)
+            except Exception:
+                continue
+            if cnum in kinds:
+                doc.Delete(el.Id)
+                gone += 1
+    if gone:
+        say("Took out %d foundation elements earlier runs of this project built in this model." % gone)
+    return gone
+
+
+def level_at(name, entries, existing):
+    """The model level standing where the drawings' level `name` stands, when the model has
+    none of that name: the only level within 1 mm of its elevation, and not itself another
+    of the drawings' levels (that one is its own floor). None otherwise."""
+    mine = [e for e in entries if (e.get("revit_name") or "").strip().lower() == str(name).strip().lower()
+            and e.get("elevation_mm") is not None and e.get("status") in ("read", "override")]
+    if len(mine) != 1:
+        return None
+    z = float(mine[0]["elevation_mm"])
+    named = set((e.get("revit_name") or "").strip().lower() for e in entries)
+    at = [n for n, v in existing.items() if abs(float(v) - z) <= 1.0]
+    if len(at) != 1 or at[0].strip().lower() in named:
+        return None
+    return at[0]
 
 
 def build(doc, src):
@@ -418,6 +534,8 @@ def build(doc, src):
                 doc.Delete(el.Id)
                 gone += 1
         say("Took out %d elements the previous run of this script placed." % gone)
+    if REPLACE_PREVIOUS:
+        _delete_earlier_runs(doc, src)
     placed = []
 
     # levels
@@ -443,6 +561,13 @@ def build(doc, src):
                 say("LEVEL    '%s' not set up: %s" % (name, detail))
 
     level = next((l for l in levels() if l.Name.strip().upper() == (fd.get("level_name") or "").strip().upper()), None)
+    if level is None and os.path.exists(lv_file):
+        with io.open(lv_file, encoding="utf-8") as f:
+            stand = level_at(fd.get("level_name") or "", json.load(f), dict((l.Name, to_mm(l.Elevation)) for l in levels()))
+        if stand:
+            level = next(l for l in levels() if l.Name == stand)
+            say("LEVEL    no level is named '%s'; '%s' stands at its height, so the foundations hang from it. "
+                "Rename it '%s' in Revit if you like." % (fd.get("level_name"), stand, fd.get("level_name")))
     if level is None:
         say("STOP: the model has no level named '%s', which the footings hang from. Create it (or "
             "rename the right one) and run again." % fd.get("level_name"))
@@ -532,7 +657,7 @@ def build(doc, src):
         for r in raft_slabs(fd.get("items") or [], level_mm, drawn_mm):
             try:
                 pts = slab_loop_points(r["outline"])
-                ft = floor_type_for(r["thickness"], cache)
+                ft = raft_type_for(r["thickness"], cache)
                 if not pts or ft is None:
                     say("raft %s: no usable outline or floor type" % r["mark"])
                     continue
@@ -549,6 +674,7 @@ def build(doc, src):
                     say("WARNING  raft %s: could not lower it to %+.0f mm" % (r["mark"], r["top"] - level_mm))
                 set_mark(fl, r["mark"])
                 set_comment(fl, "RAFT %s | %d mm | from CAD (stage 8)" % (r["mark"], round(r["thickness"])))
+                say("RAFT     %s: %d mm, type '%s'" % (r["mark"], round(r["thickness"]), ft.Name))
                 placed.append(fl.UniqueId)
                 made["rafts"] += 1
             except Exception as exc:
@@ -698,6 +824,7 @@ def main():
         with io.open(pf, encoding="utf-8") as f:
             rec = json.load(f)
     rec[doc.PathName or doc.Title] = placed
+    rec.setdefault("doc_ids", {})[doc.PathName or doc.Title] = _doc_id(doc)
     _write(pf, json.dumps(rec, indent=1))
     _write(os.path.join(os.path.dirname(src), "build_extras_log.txt"), "\n".join(log))
 
